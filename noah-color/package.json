@@ -1,0 +1,97 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "title": "颜色助手",
+  "description": "屏幕取色、转换色值、比较颜色，浏览色卡并生成配色和渐变。",
+  "icon": "icon-172acdba.png",
+  "author": "NoahCodeGG",
+  "categories": [
+    "Design Tools"
+  ],
+  "platforms": [
+    "macOS"
+  ],
+  "preferences": [
+    {
+      "name": "screenColorFormat",
+      "title": "取色复制格式",
+      "description": "快速取色和最近取色使用的默认复制格式。",
+      "type": "dropdown",
+      "required": false,
+      "default": "HEX",
+      "data": [
+        {
+          "title": "HEX（大写）",
+          "value": "HEX"
+        },
+        {
+          "title": "HEX（小写）",
+          "value": "hex-lowercase"
+        },
+        {
+          "title": "RGB",
+          "value": "RGB"
+        },
+        {
+          "title": "HSL",
+          "value": "HSL"
+        }
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "name": "color-assistant",
+      "title": "颜色助手",
+      "description": "输入色值或打开取色、图片色卡、渐变、收藏和 AI 配色。",
+      "mode": "view",
+      "keywords": [
+        "颜色",
+        "取色",
+        "色卡",
+        "配色",
+        "渐变",
+        "传统色",
+        "颜色转换",
+        "color",
+        "eyedropper",
+        "palette",
+        "gradient",
+        "hex",
+        "rgb",
+        "hsl"
+      ]
+    },
+    {
+      "name": "pick-screen-color",
+      "title": "快速屏幕取色",
+      "description": "点击屏幕上的像素，自动复制颜色并保存到最近取色。",
+      "mode": "no-view",
+      "keywords": [
+        "屏幕取色",
+        "吸管",
+        "取色",
+        "拾色",
+        "pick color",
+        "color picker",
+        "eyedropper"
+      ]
+    },
+    {
+      "name": "recent-screen-colors",
+      "title": "最近取色",
+      "description": "查找、复制或收藏最近取过的屏幕颜色。",
+      "mode": "view",
+      "keywords": [
+        "颜色历史",
+        "取色历史",
+        "recent colors",
+        "color history"
+      ]
+    }
+  ],
+  "name": "noah-color",
+  "version": "0.1.0",
+  "scripts": {
+    "build": "node verify-github-install.mjs"
+  }
+}

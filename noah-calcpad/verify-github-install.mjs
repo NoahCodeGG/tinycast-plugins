@@ -13,6 +13,9 @@ export async function verifyInstall(directory) {
     await access(join(directory, name + ".js"));
   }
 
+  if (manifest.name === "noah-color") {
+    await access(join(assets, "color-helper"), constants.X_OK);
+  }
   if (manifest.name === "noah-kdbx") {
     await access(join(assets, "kdbx-helper", "tinycast-kdbx"), constants.X_OK);
   }
