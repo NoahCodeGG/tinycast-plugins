@@ -1,0 +1,21 @@
+[package]
+name = "tinycast-kdbx"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+base64 = "0.22"
+libc = "0.2"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+keepass = { version = "=0.17.0", path = "vendor/keepass", features = ["save_kdbx4", "totp", "_merge"] }
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+url = "2.5"
+zeroize = { version = "1", features = ["serde"] }
+
+[profile.release]
+strip = true
+lto = "thin"
+panic = "abort"

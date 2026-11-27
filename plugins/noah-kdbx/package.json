@@ -1,0 +1,8 @@
+{
+  "name": "noah-kdbx",
+  "version": "0.9.1",
+  "private": true,
+  "scripts": {
+    "build": "node build-helper.mjs && node ../../scripts/build.mjs"
+  }
+}
