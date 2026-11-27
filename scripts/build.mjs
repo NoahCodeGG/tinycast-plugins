@@ -19,6 +19,7 @@ const result = await build({
   format: "cjs",
   platform: "node",
   target: "es2022",
+  charset: process.argv.includes("--utf8") ? "utf8" : "ascii",
   jsx: "automatic",
   minify: true,
   external: ["@raycast/api", "react", "react/jsx-runtime"],

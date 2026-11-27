@@ -8,6 +8,7 @@ import { runHelper, VaultError, type Attachment, type Changes, type Credentials,
 import { authorizeCloud, clearCloudAuth, providers, type CloudAuth, type Provider } from "../cloud-oauth";
 import { downloadCloud, remoteResource, uploadCloud, type CloudDrive } from "../cloud-drive";
 import { downloadWebDav, RemoteConflict, uploadWebDav, webDavConnection, type CancelRegistration, type WebDav } from "../webdav";
+import { matchesSearch, searchTerms } from "../search";
 
 type RekeyValues = { name: string; master: string; confirmation: string; keyfile: string[] };
 type AdvancedValues = { pattern: string; regex: boolean; protected: boolean; history: boolean };
@@ -98,12 +99,6 @@ function entryImage(entry: Entry, session: Session) {
   const image = session.vault.icons[entry.icon];
   return image ? `data:image/png;base64,${image}`
     : entryIcons.find(({ value }) => value === entry.icon)?.image ?? Icon.Image;
-}
-
-function searchTerms(query: string) {
-  return [...query.toLowerCase().matchAll(/(?:(title|user|url|group|tag|vault|color):)?(?:"([^"]*)"|(\S+))/g)]
-    .map(([, field, phrase, word]) => ({ field, term: phrase ?? word }))
-    .filter(({ term }) => term.length > 0);
 }
 
 function versionTitle(version: Version) {
@@ -1670,13 +1665,12 @@ export default function OpenKdbx() {
     session.vault.entries.filter((entry) => {
       if (trash !== entry.trashed || (group && group !== entry.group_id)) return false;
       if (advancedMatches && !advancedMatches.has(session.path + ":" + entry.id)) return false;
-      const fields: Record<string, string> = {
+      if (!terms.length) return true;
+      return matchesSearch({
         title: entry.title, user: entry.username, url: entry.url, group: entry.group,
         tag: entry.tags.join("\n"), vault: basename(session.path),
         color: entry.color ? `${entry.color} ${entryColors.find(({ value }) => value === entry.color)?.title ?? ""}` : "",
-      };
-      const text = Object.values(fields).join("\n").toLowerCase();
-      return terms.every(({ field, term }) => (field ? fields[field].toLowerCase() : text).includes(term));
+      }, terms);
     }).map((entry) => ({ entry, session })),
   ).sort((a, b) => a.entry.title.localeCompare(b.entry.title) || a.session.path.localeCompare(b.session.path));
 

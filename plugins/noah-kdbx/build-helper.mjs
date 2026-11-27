@@ -35,3 +35,5 @@ for (const dependency of dependencies.sort((a, b) => a.name.localeCompare(b.name
   notices.push([dependency.name + " " + dependency.version + " — " + (dependency.license ?? "See license"), ...contents].join("\n\n"));
 }
 await writeFile(join(assets, "RUST-DEPENDENCIES.txt"), notices.join("\n\n" + "-".repeat(70) + "\n\n") + "\n");
+const pinyinPackage = import.meta.resolve("pinyin-pro/package.json");
+await copyFile(new URL("LICENSE", pinyinPackage), join(assets, "PINYIN-PRO-LICENSE.txt"));

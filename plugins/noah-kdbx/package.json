@@ -3,6 +3,9 @@
   "version": "0.9.1",
   "private": true,
   "scripts": {
-    "build": "node build-helper.mjs && node ../../scripts/build.mjs"
+    "build": "node build-helper.mjs && node ../../scripts/build.mjs --utf8"
+  },
+  "dependencies": {
+    "pinyin-pro": "3.29.5"
   }
 }
