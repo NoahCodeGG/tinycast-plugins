@@ -37,6 +37,11 @@ Tinycast 匿名读取 GitHub。使用私有仓库时，可通过下方的目录�
 - **文本与文件哈希** 提供 MD5、SHA-1、SHA-224、SHA-256、SHA-384 和 SHA-512。文件按块读取，在一次读取中计算六种摘要。
 - **进制转换** 支持带符号的大整数，使用 `0b`、`0o`、`0x` 指定输入进制。**Unicode 与 HTML 实体** 支持码位、UTF-8 字节、UTF-16 转义以及 HTML 命名和数字实体解码。文本输入上限为 65,536 个 UTF-16 代码单元。
 
+#### 参考
+
+- 时间转换、Base64、URL 编解码和输入识别的交互参考了 [uTools 编码小助手](https://www.u-tools.cn/plugins/detail/%E7%BC%96%E7%A0%81%E5%B0%8F%E5%8A%A9%E6%89%8B/)。
+- 哈希和 HTML 实体转换分别使用 [@noble/hashes](https://github.com/paulmillr/noble-hashes) 和 [entities](https://github.com/fb55/entities)，许可证位于[插件资源目录](plugins/noah-codec/assets/)。
+
 ### 计算稿纸
 
 打开 **计算稿纸** 就能在顶部输入算式，结果会实时显示并保存到本机。比如输入 `128 * 2`，按 `Return` 带入 `256`，再输入 `* 85%` 即可接着算出 `217.6`。
@@ -55,6 +60,11 @@ ans + 10         # 加运费
 
 支持小数、科学计数法、括号、`+ - * / ^`、后缀百分号和 `sqrt`、`abs`、`round`、`floor`、`ceil`、`min`、`max`、`mod`。`ans` 是最近一行的有效结果，`@n` 引用上方第 `n` 行，`#` 后是备注。百分号按数学比例处理，例如 `200 * 10%` 得到 `20`。
 
+#### 参考
+
+- 实时计算、自动保存、回车带入上一步结果和逐行备注的交互参考了 [uTools 计算稿纸](https://www.u-tools.cn/plugins/detail/%E8%AE%A1%E7%AE%97%E7%A8%BF%E7%BA%B8/index.html)。
+- 十进制运算使用 [decimal.js](https://github.com/MikeMcl/decimal.js)，许可证见 [LICENSE-decimal-js.txt](plugins/noah-calcpad/assets/LICENSE-decimal-js.txt)。
+
 ### 颜色助手
 
 在 Tinycast 搜索 **颜色助手**。进入插件后粘贴 `#6E64D0`、`rgb(110 100 208 / 50%)` 或 `hsl(246 53% 60%)`，按回车打开转换结果。也可从工具列表打开屏幕取色，点击屏幕上的像素后查看并复制色值。
@@ -67,6 +77,12 @@ ans + 10         # 加运费
 - **AI 配色** 在「AI 配色 → AI 接口配置」填写兼容 OpenAI 的 API 地址、模型和密钥。可按主色、风格和冷暖出配色，也可对已有色板命名并生成 PNG 图片。生图需配置返回 PNG Base64 的图像模型。地址和模型保存在本机，密钥随本次插件运行结束清除。
 
 从源码运行 `pnpm --filter noah-color build` 需要 macOS 和 Xcode Command Line Tools。产物中的取色程序同时支持 Apple Silicon 和 Intel。
+
+#### 参考
+
+- 颜色转换与对比、图片色卡、UI 色卡、传统色、渐变和 AI 配色的功能设计参考了 [uTools 颜色助手](https://www.u-tools.cn/plugins/detail/%E9%A2%9C%E8%89%B2%E5%8A%A9%E6%89%8B/)。
+- 独立取色命令、点选后自动复制、可选复制格式和最近取色记录的交互参考了 [Raycast Color Picker 源码（`8d84639`）](https://github.com/raycast/extensions/tree/8d846393b506d23c5d9ebae29bb35e3dc7653829/extensions/color-picker/)。
+- UI 色卡和传统色的数据来源见 [色卡来源清单](plugins/noah-color/assets/palette-sources.txt)，对应许可证位于同一目录。
 
 ### KDBX 密码库
 
@@ -136,6 +152,11 @@ KDBX 4 的库菜单可以选择 **更改主密码或密钥**。更改后会打�
 | 更改 OAuth 客户端 ID | 云端配置页 `⌘⇧I` |
 | 新建密码库、移除最近记录 | 解锁页 `⌘N`、`⌘⌫` |
 | 取消或返回上一页 | `⌘[` |
+
+#### 参考
+
+- 文件格式见 [KeePass KDBX 官方规范](https://keepass.info/help/kb/kdbx.html)。
+- 原生辅助程序内置 [keepass-rs](https://github.com/sseemayer/keepass-rs) 0.17.0，用于读取和写入密码库。仓库提供[源码许可证](plugins/noah-kdbx/helper/vendor/keepass/LICENSE)及 [Tinycast 补丁说明](plugins/noah-kdbx/helper/vendor/keepass/TINYCAST-PATCH.md)。
 
 ## 构建与分享
 
