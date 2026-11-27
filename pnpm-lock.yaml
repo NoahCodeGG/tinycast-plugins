@@ -27,6 +27,21 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
 
+  plugins/noah-calcpad:
+    dependencies:
+      decimal.js:
+        specifier: 10.6.0
+        version: 10.6.0
+
+  plugins/noah-codec:
+    dependencies:
+      '@noble/hashes':
+        specifier: 1.8.0
+        version: 1.8.0
+      entities:
+        specifier: 6.0.1
+        version: 6.0.1
+
   plugins/noah-kdbx: {}
 
 packages:
@@ -321,6 +336,10 @@ packages:
       '@types/node':
         optional: true
 
+  '@noble/hashes@1.8.0':
+    resolution: {integrity: sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A==}
+    engines: {node: ^14.21.3 || >=16}
+
   '@oclif/core@4.14.0':
     resolution: {integrity: sha512-QCJIZoVJxV7jywgVAUlsQwl3dr3Sa21kfi5z9KrYolbexWJUtFSEtMoNiBWojD05mYycLnB50gp/VxlGdaOCRA==}
     engines: {node: '>=18.0.0'}
@@ -429,6 +448,9 @@ packages:
       supports-color:
         optional: true
 
+  decimal.js@10.6.0:
+    resolution: {integrity: sha512-YpgQiITW3JXGntzdUmyUR1V812Hn8T1YVXhCu+wO3OpS4eU9l4YdD3qjyiKdV6mvV29zapkMeD390UVEf2lkUg==}
+
   ejs@3.1.10:
     resolution: {integrity: sha512-UeJmFfOrAQS8OJWPZ4qtgHyWExa088/MtK5UEyoJGFH67cDEXkZSviOiKRCZ4Xij0zxI3JECgYs3oKx+AizQBA==}
     engines: {node: '>=0.10.0'}
@@ -441,6 +463,10 @@ packages:
 
   emoji-regex@8.0.0:
     resolution: {integrity: sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==}
+
+  entities@6.0.1:
+    resolution: {integrity: sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g==}
+    engines: {node: '>=0.12'}
 
   esbuild@0.25.12:
     resolution: {integrity: sha512-bbPBYYrtZbkt6Os6FiTLCTFxvq4tt3JKall1vRwshA3fdVztsLAatFaZobhkBC8/BrPetoa0oksYoKXoG4ryJg==}
@@ -818,6 +844,8 @@ snapshots:
     optionalDependencies:
       '@types/node': 20.8.10
 
+  '@noble/hashes@1.8.0': {}
+
   '@oclif/core@4.14.0':
     dependencies:
       ansi-escapes: 4.3.2
@@ -936,6 +964,8 @@ snapshots:
     optionalDependencies:
       supports-color: 8.1.1
 
+  decimal.js@10.6.0: {}
+
   ejs@3.1.10:
     dependencies:
       jake: 10.9.4
@@ -943,6 +973,8 @@ snapshots:
   ejs@6.0.1: {}
 
   emoji-regex@8.0.0: {}
+
+  entities@6.0.1: {}
 
   esbuild@0.25.12:
     optionalDependencies:

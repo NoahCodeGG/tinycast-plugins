@@ -1,0 +1,12 @@
+{
+  "name": "noah-codec",
+  "version": "0.5.0",
+  "private": true,
+  "scripts": {
+    "build": "node ../../scripts/build.mjs"
+  },
+  "dependencies": {
+    "@noble/hashes": "1.8.0",
+    "entities": "6.0.1"
+  }
+}
