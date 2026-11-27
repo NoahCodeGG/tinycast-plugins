@@ -1,166 +1,92 @@
-# Noah's Tinycast Plugins
+<a id="readme-top"></a>
 
-面向 macOS Tinycast 的插件集合。本地功能无需云端账号或 API 密钥。
+<div align="center">
+  <p><img src="plugins/noah-calcpad/assets/icon.png" width="48" alt="计算稿纸">&nbsp;&nbsp;<img src="plugins/noah-codec/assets/icon.png" width="48" alt="编码小助手">&nbsp;&nbsp;<img src="plugins/noah-color/assets/icon.png" width="48" alt="颜色助手">&nbsp;&nbsp;<img src="plugins/noah-kdbx/assets/icon.png" width="48" alt="KDBX 密码库"></p>
 
-## 安装和使用
+  <h1>Noah’s Tinycast Plugins</h1>
 
-### 从 GitHub 安装
+  <p>面向 macOS Tinycast 的插件集合，涵盖计算、编码转换、取色和密码库管理。</p>
 
-在 Tinycast 的 **Settings → Extensions → Install from GitHub** 中粘贴所需插件的目录链接。一次安装一个插件。Tinycast 需要能找到 Node.js 和一个包管理器。
+  <p>
+    <a href="https://github.com/NoahCodeGG/tinycast-plugins/actions/workflows/tinycast-install.yml">
+      <img src="https://github.com/NoahCodeGG/tinycast-plugins/actions/workflows/tinycast-install.yml/badge.svg?branch=main" alt="发布工作流状态">
+    </a>
+  </p>
 
-| 插件 | 安装目录 |
-| --- | --- |
-| 编码小助手 | [noah-codec](https://github.com/NoahCodeGG/tinycast-plugins/tree/tinycast-install/noah-codec) |
-| 计算稿纸 | [noah-calcpad](https://github.com/NoahCodeGG/tinycast-plugins/tree/tinycast-install/noah-calcpad) |
-| KDBX 密码库 | [noah-kdbx](https://github.com/NoahCodeGG/tinycast-plugins/tree/tinycast-install/noah-kdbx) |
+  <p>
+    <a href="#插件列表"><strong>查看插件</strong></a>
+    ·
+    <a href="#安装">安装指南</a>
+    ·
+    <a href="https://github.com/NoahCodeGG/tinycast-plugins/issues">反馈问题或建议</a>
+  </p>
+</div>
 
-Tinycast 匿名读取 GitHub。使用私有仓库时，可通过下方的目录导入方式安装。GitHub 分发的 KDBX 插件包含 Apple Silicon 版读取程序。
+<details>
+  <summary>目录</summary>
 
-### 从本地目录安装
+- [关于项目](#关于项目)
+  - [技术栈](#技术栈)
+- [快速开始](#快速开始)
+  - [插件列表](#插件列表)
+  - [安装](#安装)
+- [使用](#使用)
+- [构建与发布](#构建与发布)
+- [反馈与贡献](#反馈与贡献)
+- [第三方许可证](#第三方许可证)
+- [致谢](#致谢)
 
-1. 解压要安装的 ZIP。解压后的目录应包含 `package.json`、命令的 `.js` 文件和 `assets/`。
-2. 在 Tinycast 设置中启用扩展，从 **Extensions → Install New → Add from folder** 选择解压后的目录。从源码构建时，选择对应插件的 `dist/` 目录。
+</details>
 
-### 编码小助手
+## 关于项目
 
-搜索 **编码小助手** 打开工具列表，也可以直接搜索具体工具名。输入时，结果即时显示在各行。按行尾标出的 `⌘1`、`⌘2` 等可直接复制对应结果，或用 `↑`、`↓` 选中后按 `Return`。复制后工具仍保持打开。
+在 Tinycast 启动器里逐行计算、转换常见编码和时间戳、从屏幕取色，或浏览和编辑本地 KeePass 密码库。这些本地操作均可离线使用。每个插件可以单独安装。
 
-单行文本可以直接输入或粘贴到搜索框。多行内容用 `⌘⇧V` 直接读取剪贴板，保留换行。用 `⌘E` 打开多行编辑器，修改后选择 **应用文本** 返回结果。按 `⌘P` 可展开或关闭结果预览。较长结果只预览前段，复制时包含完整内容。
+### 技术栈
 
-**识别输入**：打开「编码小助手」后直接粘贴带百分号编码的 URL、Base64、时间戳、带前缀的进制数、Unicode 转义或图片 Data URI。选择识别结果时，输入会自动带到对应工具。也可以用 `⌘⇧V` 识别完整剪贴板文本。
+- 插件命令使用 TypeScript 和 React，通过 Tinycast 的 Raycast 兼容 API 运行。
+- pnpm 管理工作区，esbuild 将命令打包为 CommonJS。
+- 颜色助手使用 macOS AppKit 和 ImageIO 取色与读取图片。KDBX 密码库使用 Rust 辅助程序读写密码库。
 
-**从主搜索传入**：在「编码小助手」的操作菜单选择 **配置主搜索入口**，保存预填的「识别编码输入」Quicklink。以后可在 Tinycast 主搜索粘贴值，再在底部的 **Use … with** 选择「识别编码输入」。只有一个匹配时会直接打开该工具。这个主搜索入口依赖 Tinycast 的 Quicklinks 功能。
+## 快速开始
 
-- **Base64** 支持 UTF-8 文本和 Base64URL。图片支持 PNG、JPEG、GIF、WebP、BMP 和 TIFF，最大 8 MiB。图片可复制为原始 Base64 或 Data URI。解码时选择保存目录，插件会新建子目录保存图片，并提供在 Finder 中显示的操作。
-- **时间戳** 留空取当前时间。支持 `1700000000s`、`1700000000000ms`、`2024-01-01T08:00:00+08:00` 和本地时间 `2024-01-01 08:00:00`。纯日期按 UTC 零点解释。整数省略单位时，绝对值小于 100,000,000,000 按秒解释，其余按毫秒解释。
-- **其他时区** 在时间戳工具按 `⌘T` 或从操作菜单打开。可按城市名、IANA 名称（如 `America/New_York`）或固定偏移（如 `UTC+05:30`）添加。选中「已添加」的时区按 `Return` 可移除，再按 `⌘T` 返回转换结果。所选时区会保留到下次使用，城市时区会根据转换日期计算夏令时和 UTC 偏移。
-- **文本与文件哈希** 提供 MD5、SHA-1、SHA-224、SHA-256、SHA-384 和 SHA-512。文件按块读取，在一次读取中计算六种摘要。
-- **进制转换** 支持带符号的大整数，使用 `0b`、`0o`、`0x` 指定输入进制。**Unicode 与 HTML 实体** 支持码位、UTF-8 字节、UTF-16 转义以及 HTML 命名和数字实体解码。文本输入上限为 65,536 个 UTF-16 代码单元。
+### 插件列表
 
-#### 参考
+发布工作流会根据已发布的插件清单同步本表。
 
-- 时间转换、Base64、URL 编解码和输入识别的交互参考了 [uTools 编码小助手](https://www.u-tools.cn/plugins/detail/%E7%BC%96%E7%A0%81%E5%B0%8F%E5%8A%A9%E6%89%8B/)。
-- 哈希和 HTML 实体转换分别使用 [@noble/hashes](https://github.com/paulmillr/noble-hashes) 和 [entities](https://github.com/fb55/entities)，许可证位于[插件资源目录](plugins/noah-codec/assets/)。
+<!-- tinycast-install-table:start -->
 
-### 计算稿纸
+| 插件 | 主要功能 | 文档 | GitHub 安装目录 |
+| --- | --- | --- | --- |
+| 计算稿纸 | 逐行计算、复用结果并在本机保存多张稿纸。 | [使用说明](plugins/noah-calcpad/README.md) | [noah-calcpad](https://github.com/NoahCodeGG/tinycast-plugins/tree/tinycast-install/noah-calcpad) |
+| 编码小助手 | 在本机转换文本、图片、时间戳和进制，生成 UUID 并计算文本和文件哈希。 | [使用说明](plugins/noah-codec/README.md) | [noah-codec](https://github.com/NoahCodeGG/tinycast-plugins/tree/tinycast-install/noah-codec) |
+| 颜色助手 | 屏幕取色、转换色值、比较颜色，浏览色卡并生成配色和渐变。 | [使用说明](plugins/noah-color/README.md) | [noah-color](https://github.com/NoahCodeGG/tinycast-plugins/tree/tinycast-install/noah-color) |
+| KDBX 密码库 | 在 Tinycast 内管理本地和 WebDAV KeePass 密码库，支持跨库搜索、备份及历史恢复。 | [使用说明](plugins/noah-kdbx/README.md) | [noah-kdbx](https://github.com/NoahCodeGG/tinycast-plugins/tree/tinycast-install/noah-kdbx) |
 
-打开 **计算稿纸** 就能在顶部输入算式，结果会实时显示并保存到本机。比如输入 `128 * 2`，按 `Return` 带入 `256`，再输入 `* 85%` 即可接着算出 `217.6`。
+<!-- tinycast-install-table:end -->
 
-- 用 `↑`、`↓` 选中一行，按 `Return` 从该行的结果继续，按 `⌘⇧C` 复制该行结果。按 `⌘B` 添加或修改该行备注，清空备注再保存即可移除。
-- 用 `⌘N` 新建稿纸，`⌘O` 打开可搜索的稿纸列表。列表的操作菜单可以删除选中的稿纸或删除所有稿纸，两种操作均需确认。
-- 当前稿纸的操作菜单可以改名、锁定或解锁，以及复制为 PNG 图片。锁定后可以搜索算式和备注并复制结果。图片包含稿纸名称、算式、结果和备注。
-- 用 `⌘⇧E` 编辑整张稿纸，可以清空内容或一次粘贴多行算式。用 `ans` 引用上一个成功结果，`@2` 引用第 2 行，`#` 添加备注。
+### 安装
 
-```text
-price = 128 * 2  # 原价
-price * 85%      # 折后价
-ans + 10         # 加运费
-@1 - @2          # 引用第一、二行的结果
-```
+**从 GitHub 安装**
 
-支持小数、科学计数法、括号、`+ - * / ^`、后缀百分号和 `sqrt`、`abs`、`round`、`floor`、`ceil`、`min`、`max`、`mod`。`ans` 是最近一行的有效结果，`@n` 引用上方第 `n` 行，`#` 后是备注。百分号按数学比例处理，例如 `200 * 10%` 得到 `20`。
+在 Tinycast 中打开 **Settings → Extensions → Install from GitHub**，粘贴上表中所需插件的安装目录链接。一次安装一个插件。此方式需要 Tinycast 能找到 Node.js 和一个包管理器。
 
-#### 参考
+Tinycast 匿名读取 GitHub。私有仓库可使用本地目录安装。
 
-- 实时计算、自动保存、回车带入上一步结果和逐行备注的交互参考了 [uTools 计算稿纸](https://www.u-tools.cn/plugins/detail/%E8%AE%A1%E7%AE%97%E7%A8%BF%E7%BA%B8/index.html)。
-- 十进制运算使用 [decimal.js](https://github.com/MikeMcl/decimal.js)，许可证见 [LICENSE-decimal-js.txt](plugins/noah-calcpad/assets/LICENSE-decimal-js.txt)。
+**从本地目录安装**
 
-### 颜色助手
+1. 解压插件 ZIP，或构建源码后找到对应插件的 `dist/`。用于导入的目录应包含 `package.json`、命令的 `.js` 文件和 `assets/`。
+2. 在 Tinycast 设置中启用扩展，从 **Extensions → Install New → Add from folder** 选择该目录。导入预构建插件无需 Node.js 或 pnpm。
 
-在 Tinycast 搜索 **颜色助手**。进入插件后粘贴 `#6E64D0`、`rgb(110 100 208 / 50%)` 或 `hsl(246 53% 60%)`，按回车打开转换结果。也可从工具列表打开屏幕取色，点击屏幕上的像素后查看并复制色值。
+## 使用
 
-- **快速屏幕取色** 在 Tinycast 主搜索运行「快速屏幕取色」，点击像素后自动复制。默认复制大写 HEX，可在扩展偏好设置切换为小写 HEX、RGB 或 HSL，也可为命令设置快捷键。屏幕取色会记录到「最近取色」，最多保留 50 个不同色值。打开历史即可再次复制、查看或收藏。
-- **颜色转换与对比** 支持 HEX、RGB(A)、HSL(A)、HSV / HSB 和 CMYK 输入，还可查看 HSI、CIE Lab 和互补色等搭配。颜色对比以第一项为背景，显示其余颜色与背景的 WCAG 对比度。
-- **图片色卡** 支持选取本地图片，或按 `⌘⇧V` 从剪贴板图片提取主色。色卡可复制色值或导出 PNG。
-- **UI 色卡与传统色** 提供 Flat UI、Fluent Design、Open Color、Ant Design、Material Design，以及按二十四节气分组的 384 个中国传统色和 250 个日本传统色。列表支持按色名或 HEX 搜索。
-- **渐变与收藏** 可调整色标与角度、复制 CSS，并指定尺寸导出 PNG。单色、色卡和渐变都能保存在本机收藏列表。
-- **AI 配色** 在「AI 配色 → AI 接口配置」填写兼容 OpenAI 的 API 地址、模型和密钥。可按主色、风格和冷暖出配色，也可对已有色板命名并生成 PNG 图片。生图需配置返回 PNG Base64 的图像模型。地址和模型保存在本机，密钥随本次插件运行结束清除。
+安装后，在 Tinycast 启动器里搜索插件名称或命令。例如，运行「快速屏幕取色」，点击屏幕上的像素即可复制色值。各插件的命令、快捷键、配置方式和参考资料见上表的「使用说明」。
 
-从源码运行 `pnpm --filter noah-color build` 需要 macOS 和 Xcode Command Line Tools。产物中的取色程序同时支持 Apple Silicon 和 Intel。
+[返回顶部](#readme-top)
 
-#### 参考
+## 构建与发布
 
-- 颜色转换与对比、图片色卡、UI 色卡、传统色、渐变和 AI 配色的功能设计参考了 [uTools 颜色助手](https://www.u-tools.cn/plugins/detail/%E9%A2%9C%E8%89%B2%E5%8A%A9%E6%89%8B/)。
-- 独立取色命令、点选后自动复制、可选复制格式和最近取色记录的交互参考了 [Raycast Color Picker 源码（`8d84639`）](https://github.com/raycast/extensions/tree/8d846393b506d23c5d9ebae29bb35e3dc7653829/extensions/color-picker/)。
-- UI 色卡和传统色的数据来源见 [色卡来源清单](plugins/noah-color/assets/palette-sources.txt)，对应许可证位于同一目录。
-
-### KDBX 密码库
-
-安装 `noah-kdbx` 后，在 Tinycast 搜索 **打开 KDBX 密码库**。选中本地 `.kdbx`，输入主密码，必要时选择密钥文件。解锁后可按标题、用户名、网址、分组或标签搜索，也可从搜索栏右侧按分组筛选。条目菜单提供复制用户名、密码、网址和备注。
-
-成功打开的本地文件会加入 **最近打开**，包括通过 OneDrive 客户端同步到本机的文件。下次启动会预选最近使用的密码库，填入主密码即可解锁。可以切换其他最近文件、选择新文件，或通过操作菜单从最近打开中移除选中的记录。最近列表只保存密码库和密钥文件的路径。
-
-解锁后可按 `⌘O` 打开另一密码库。多个库同时解锁时，统一搜索会标出每条结果所属的库，也支持按文件名搜索。从结果操作菜单可直接复制或编辑对应条目，或进入所属库。**已解锁的密码库** 可切换或单独锁定某一个库。按 `⌘L` 会锁定所有已解锁的库。
-
-KDBX 3 支持只读浏览。打开 KDBX 4 后，按 `⌘N` 新建条目，或选中条目按 `⌘E` 编辑。编辑页可选择目标分组，也可用分号分隔多个标签。保存时在同一目录创建新的加密副本，沿用当前的主密码和密钥文件，随后自动打开副本。原库保留，副本文件名须唯一。编辑时留空新密码或新备注会保留原值。
-
-导入含重复条目 ID 的密码库时，插件保留首次出现的 ID，为后续条目分配稳定的新 ID，并保留各自的历史记录。打开时只在内存处理，保存时才写入分配后的 ID。旧 ID 的引用仍指向第一个条目。KDBX 4.0 的修改会以 KDBX 4.1 格式保存。
-
-密码库操作菜单可以新建、重命名、移动分组，以及将分组或条目移入回收站。回收站可以恢复条目和分组，原位置不可用时恢复到根分组。永久删除需确认。编辑和管理还可选择 **更新当前库并备份**，确认后在原路径保存更改，并将旧版本保留为同目录的加密备份。
-
-解锁页的操作菜单提供 **新建密码库**，可指定保存目录、文件名、主密码和可选密钥文件。在条目编辑页，可用 **密码生成器** 按长度和字符类型生成并填入密码，也可填写 `otpauth://totp/…` 链接。保存后从条目菜单选择 **复制 TOTP 验证码**。
-
-条目菜单中的 **查看条目历史** 可查找历史版本和查看旧附件。恢复会恢复字段、标签、附件和图标，并保留恢复前的版本和条目的当前分组。**管理附件** 可添加不超过 32 MiB 的附件、预览不超过 2 MiB 的 PNG 或 JPEG、导出附件或从当前版本移除附件。历史中的附件仍可访问。导出会生成普通文件，已存在的同名文件会保留。
-
-编辑页可为条目选择颜色和内置图标，也可导入 PNG 或 JPEG 图标。**自定义字段** 支持添加、编辑、删除和机密复制。受保护的字段值在列表中保持隐藏。搜索可限定 `title:`、`user:`、`url:`、`group:`、`tag:`、`vault:` 或 `color:`，例如 `title:"工作账号" color:蓝色`。**高级搜索** 可使用正则，并可选择匹配受保护字段或历史版本。搜索内容输入框保持遮蔽，结果只显示匹配条目。
-
-操作菜单中的 **查看表格** 以表格显示当前筛选结果。复制和编辑操作可从条目列表执行。
-
-KDBX 4 的库菜单可以选择 **更改主密码或密钥**。更改后会打开用新凭据加密的副本，原库仍使用原来的凭据。
-
-**打开 WebDAV 密码库** 支持通过 HTTPS 下载到手动选择的本地目录。可用匿名访问或 Basic 认证。更新要求服务端提供强 ETag 并遵守 `If-Match`。创建远端文件要求服务端支持 `If-None-Match: *`。
-
-在 Tinycast 中选择 **打开云端密码库**，再选择服务商。首次使用时输入自己的 OAuth 客户端 ID，并选择 **在浏览器中授权**。授权成功后插件会记住客户端 ID。之后选择 Dropbox、OneDrive 或 Teams 会直接打开系统浏览器授权窗口。授权完成后，再在 Tinycast 中填写远端路径并选择 **下载并解锁**。令牌和密钥仅用于当前会话。
-
-| 服务商 | 应用注册要求 | 远端文件与写入 |
-| --- | --- | --- |
-| Dropbox | 注册 `http://localhost:53682/oauth/callback`，开启 `files.content.read` 和 `files.content.write` | 输入 `/Vault.kdbx` 一类的路径。保存修改后可按 Dropbox revision 条件上传。 |
-| Google Drive | 启用 Drive API，使用 Desktop app OAuth 客户端并允许 `drive`。若客户端要求密钥，在授权表单中填写。 | 打开时输入文件 ID 或 Drive 文件链接，新建时输入文件名。同步先检查 `headRevisionId`，服务端返回强 ETag 时也会送出 `If-Match`。Drive v3 未明确保证媒体上传的原子版本校验。 |
-| OneDrive | 注册 Mobile and desktop applications 平台的 `http://localhost/oauth/callback`，授权委托权限 `Files.ReadWrite`。 | 输入从网盘根目录开始的路径，更新使用 Graph 文件 ETag。 |
-| Microsoft Teams | 使用 Entra 工作或学校账户的桌面应用，注册同一个本机回调，并授权委托权限 `Files.ReadWrite.All`。 | 输入 `/团队 ID/文件夹/密码库.kdbx`，更新使用团队文件的 Graph ETag。 |
-
-打开本地库后，可用 **另存到云端** 或 **另存到 WebDAV** 创建远端密码库。对已有远端关联的库，可以主动上传或为当前会话开启 **保存后自动同步**。检测到远端版本冲突时，插件会重新下载，用当前密码和密钥文件合并同一密码库的两个版本，然后用新版本标识重试一次。原本的本地加密文件会保留，凭据变更、不同的数据库或无法安全合并的情况会中止。连接及自动同步状态在锁定后清除。
-
-库名旁会显示 **待同步**、**同步中**、**已同步** 或 **同步失败**。库页面按 `⌘S` 可直接同步，在多库列表中会同步选中项所属的库。编辑页的 `⌘S` 会先保存并备份本地文件，开启自动同步的库随后会上传。
-
-插件支持最大 128 MiB 的密码库及最多 5,000 条可见条目。主密码仅供当前会话使用。关闭命令、按 `⌘L` 或闲置 5 分钟会锁定密码库。复制内容标记为机密，以避开 Tinycast 的剪贴板历史。复制内容会留在系统剪贴板，直至被替换或清空。
-
-#### 键盘快捷键
-
-快捷键随当前页面和所选条目变化。按 `⌘K` 可以查看当前能用的操作及其按键。列表通过方向键和回车选择，表单使用 `Tab` 切换字段，主操作使用 Tinycast 的 `⌘↩`，包括解锁、授权、创建以及确认表单。
-
-| 操作 | 快捷键 |
-| --- | --- |
-| 复制密码、用户名、网址、TOTP、备注 | `⌘C`、`⌘B`、`⌘U`、`⌥2`、`⌘⇧C` |
-| 新建、编辑条目 | `⌘N`、`⌘E` |
-| 保存并备份当前库、保存为加密副本 | 编辑页 `⌘S`、`⌘⇧S` |
-| 打开另一密码库、云端库、WebDAV 库 | `⌘O`、`⌘⇧O`、`⌘⌥O` |
-| 搜索所有库、查看已解锁的库、查看所选库 | `⌘⇧A`、`⌘⇧L`、`⌘⇧V` |
-| 锁定所有库、在已解锁列表中锁定所选库 | `⌘L`、`⌘⌥L` |
-| 高级搜索、清除高级筛选、查看表格 | `⌘⇧F`、`⌘⌥F`、`⌘⌥T` |
-| 自定义字段、条目历史、附件 | `⌘⇧D`、`⌘⇧H`、`⌘⇧J` |
-| 添加字段或附件、编辑字段、复制字段 | 对应列表 `⌘N`、`⌘E`、`⌘C` |
-| 预览、导出附件 | 附件列表 `⌘P`、`⌘⇧S` |
-| 新建、重命名、移动分组 | `⌘⇧N`、`⌘⇧E`、`⌘⇧M` |
-| 打开或退出回收站 | `⌘⇧T` |
-| 条目移入回收站、恢复、永久删除 | `⌘⌫`、`⌘R`、`⌘⇧⌫` |
-| 分组移入回收站、恢复、永久删除 | `⌘⌥⌫`、`⌘⌥R`、`⌘⌥⇧⌫` |
-| 恢复历史字段、删除历史版本或所选字段及附件 | 对应列表 `⌘R`、`⌘⇧⌫` |
-| 更改主密码或密钥、打开密码生成器 | `⌘⇧P`、编辑页 `⌘G` |
-| 同步当前或所选的远端密码库 | 库页面 `⌘S` |
-| 另存到云端、另存到 WebDAV、切换保存后自动同步 | `⌘⌥⇧S`、`⌘⌥S`、`⌘⇧Y` |
-| 更改 OAuth 客户端 ID | 云端配置页 `⌘⇧I` |
-| 新建密码库、移除最近记录 | 解锁页 `⌘N`、`⌘⌫` |
-| 取消或返回上一页 | `⌘[` |
-
-#### 参考
-
-- 文件格式见 [KeePass KDBX 官方规范](https://keepass.info/help/kb/kdbx.html)。
-- 原生辅助程序内置 [keepass-rs](https://github.com/sseemayer/keepass-rs) 0.17.0，用于读取和写入密码库。仓库提供[源码许可证](plugins/noah-kdbx/helper/vendor/keepass/LICENSE)及 [Tinycast 补丁说明](plugins/noah-kdbx/helper/vendor/keepass/TINYCAST-PATCH.md)。
-
-## 构建与分享
-
-在有 Node.js 22+ 和 pnpm 10.12.1 的环境中运行。
+使用 Node.js 22+ 和 pnpm 10.12.1。构建所有插件需要 macOS、Xcode Command Line Tools 和 Rust 1.94+。
 
 ```sh
 pnpm install --frozen-lockfile
@@ -168,12 +94,31 @@ pnpm typecheck
 pnpm build
 ```
 
-运行 `pnpm package` 重新构建并在 `artifacts/` 生成带版本号的 ZIP。打包使用系统的 `zip` 命令。可直接发送 ZIP 或将其上传到 GitHub Release。接收者只需解压并从 Tinycast 导入，导入预构建包无需 Node.js 或 pnpm。
+| 命令 | 用途 |
+| --- | --- |
+| `pnpm --filter <插件名> build` | 构建单个插件，产物放在对应插件的 `dist/`。 |
+| `pnpm install:local <插件名>` | 将已构建的插件安装到本机 Tinycast。 |
+| `pnpm package` | 用系统的 `zip` 命令在 `artifacts/` 生成带版本号的 ZIP，可直接分享或上传到 GitHub Release。 |
+| `pnpm package:github` | 在 `artifacts/github-install/` 生成供 GitHub 安装的独立插件目录。 |
 
-运行 `pnpm package:github` 在 `artifacts/github-install/` 为每个插件生成独立安装目录。GitHub Actions 在 `main` 上的插件或构建文件更新后构建这些目录并发布到 `tinycast-install` 分支。安装时每个目录包含所需的命令和资源，KDBX 用户无需安装 Rust。
+GitHub Actions 在 `main` 上的插件或构建文件更新后，将 GitHub 安装目录发布到 `tinycast-install` 分支，随后同步上方的插件列表。
 
-从源码构建 `noah-kdbx` 需要 macOS、Xcode Command Line Tools 和 Rust 1.94+。`pnpm --filter noah-kdbx build` 会打包与当前 Node.js 架构一致的本地读取程序。预构建 ZIP 无需 Rust，可在对应架构的 Mac 导入。
+插件命令位于 `plugins/<插件名>/src/commands/`，元数据位于 `plugins/<插件名>/src/manifest.json`，版本号由插件目录下的 `package.json` 定义。
 
-每个插件的命令在 `plugins/<插件名>/src/commands/`，元数据在 `plugins/<插件名>/src/manifest.json`，发布版本在插件根目录的 `package.json`。构建会为每条命令生成 CommonJS 文件，并让 Tinycast 在运行时提供 React 和 Raycast 兼容 API。
+## 反馈与贡献
 
-目录结构和加载方式参考 [mimukit/tinycast-plugins](https://github.com/mimukit/tinycast-plugins)。
+反馈问题时，请附上插件名称、Tinycast 版本、复现步骤和预期结果。功能建议也可通过 [GitHub Issues](https://github.com/NoahCodeGG/tinycast-plugins/issues) 提交。
+
+修改插件时，请在对应目录维护使用说明，运行类型检查和该插件的构建，然后提交 [Pull Request](https://github.com/NoahCodeGG/tinycast-plugins/pulls)。
+
+## 第三方许可证
+
+依赖与色卡数据的许可证随各插件维护，见插件文档中的「参考」章节。KDBX 辅助程序内置的依赖也保留了上游许可证。
+
+## 致谢
+
+- 插件运行环境由 [Tinycast](https://tinycast.dev/) 提供。目录结构和加载方式参考 [mimukit/tinycast-plugins](https://github.com/mimukit/tinycast-plugins)。
+- 本页结构参考 [Best-README-Template](https://github.com/othneildrew/Best-README-Template)。
+- 插件功能、数据和依赖的参考来源列在[各插件文档](#插件列表)中。
+
+[返回顶部](#readme-top)

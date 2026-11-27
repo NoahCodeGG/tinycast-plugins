@@ -66,3 +66,32 @@ jobs:
             -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
             commit -m "Build Tinycast extensions from ${source_sha:0:12}"
           git -C "$publish" push origin HEAD:refs/heads/tinycast-install
+      - name: Sync README install table
+        shell: bash
+        run: |
+          published="$RUNNER_TEMP/tinycast-install"
+          docs="$RUNNER_TEMP/tinycast-readme"
+          git fetch origin main
+          git worktree add --detach "$docs" origin/main
+
+          for attempt in 1 2 3; do
+            base="$(git -C "$docs" rev-parse HEAD)"
+            node scripts/update-install-readme.mjs "$published" "$docs/README.md" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+            if git -C "$docs" diff --quiet -- README.md; then
+              exit 0
+            fi
+
+            git -C "$docs" -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Update Tinycast install table" -- README.md
+            if git -C "$docs" push origin HEAD:refs/heads/main; then
+              exit 0
+            fi
+
+            git fetch origin main
+            latest="$(git rev-parse origin/main)"
+            if [[ "$latest" == "$base" || "$attempt" == 3 ]]; then
+              exit 1
+            fi
+            git -C "$docs" switch --detach "$latest"
+          done
