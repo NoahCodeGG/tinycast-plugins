@@ -1,0 +1,34 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "title": "KDBX 密码库",
+  "description": "在 Tinycast 内管理本地和 WebDAV KeePass 密码库，支持跨库搜索、备份及历史恢复。",
+  "icon": "icon-f18c355e.png",
+  "author": "NoahCodeGG",
+  "categories": [
+    "Productivity"
+  ],
+  "platforms": [
+    "macOS"
+  ],
+  "commands": [
+    {
+      "name": "open-kdbx",
+      "title": "打开 KDBX 密码库",
+      "description": "打开和管理本地或 WebDAV 上的 .kdbx 密码库。",
+      "mode": "view",
+      "keywords": [
+        "KeeWeb",
+        "KeePass",
+        "KDBX",
+        "vault",
+        "密码库",
+        "密码管理"
+      ]
+    }
+  ],
+  "name": "noah-kdbx",
+  "version": "0.9.1",
+  "scripts": {
+    "build": "node verify-github-install.mjs"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "title": "计算稿纸",
+  "description": "逐行计算、复用结果并在本机保存多张稿纸。",
+  "icon": "icon-679136f5.png",
+  "author": "NoahCodeGG",
+  "categories": [
+    "Productivity"
+  ],
+  "platforms": [
+    "macOS"
+  ],
+  "commands": [
+    {
+      "name": "calculation-pad",
+      "title": "计算稿纸",
+      "description": "新建、编辑和打开计算稿纸。",
+      "mode": "view",
+      "keywords": [
+        "calculator",
+        "calc",
+        "scratchpad",
+        "算式",
+        "计算器"
+      ]
+    }
+  ],
+  "name": "noah-calcpad",
+  "version": "0.4.0",
+  "scripts": {
+    "build": "node verify-github-install.mjs"
+  }
+}

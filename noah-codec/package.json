@@ -1,0 +1,144 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "title": "编码小助手",
+  "description": "在本机转换文本、图片、时间戳和进制，生成 UUID 并计算文本和文件哈希。",
+  "icon": "icon-3c6fc2cd.png",
+  "author": "NoahCodeGG",
+  "categories": [
+    "Developer Tools"
+  ],
+  "platforms": [
+    "macOS"
+  ],
+  "commands": [
+    {
+      "name": "codec-tools",
+      "title": "编码小助手",
+      "description": "打开本地编码与转换工具。",
+      "mode": "view",
+      "keywords": [
+        "codec",
+        "encode",
+        "decode",
+        "编码",
+        "解码"
+      ]
+    },
+    {
+      "name": "base64-text",
+      "title": "Base64 文本转换",
+      "description": "对 UTF-8 文本进行 Base64 编码和解码。",
+      "mode": "view",
+      "keywords": [
+        "base64",
+        "base64url"
+      ]
+    },
+    {
+      "name": "image-base64",
+      "title": "图片 Base64 转换",
+      "description": "将图片转为 Base64 或将 Base64 保存为图片。",
+      "mode": "view",
+      "keywords": [
+        "image",
+        "data uri",
+        "图片",
+        "base64"
+      ]
+    },
+    {
+      "name": "url-conversion",
+      "title": "URL 编解码",
+      "description": "编码或解码 URL 组成部分。",
+      "mode": "view",
+      "keywords": [
+        "url",
+        "percent",
+        "encode",
+        "decode"
+      ]
+    },
+    {
+      "name": "timestamp",
+      "title": "时间戳转换",
+      "description": "转换 Unix 时间戳、ISO 日期和本地时间。",
+      "mode": "view",
+      "keywords": [
+        "time",
+        "timestamp",
+        "unix",
+        "date"
+      ]
+    },
+    {
+      "name": "uuid",
+      "title": "生成 UUID",
+      "description": "生成并复制 UUID v4。",
+      "mode": "view",
+      "keywords": [
+        "uuid",
+        "guid",
+        "id"
+      ]
+    },
+    {
+      "name": "text-hash",
+      "title": "文本哈希",
+      "description": "计算文本的 MD5 和 SHA 摘要。",
+      "mode": "view",
+      "keywords": [
+        "hash",
+        "md5",
+        "sha1",
+        "sha224",
+        "sha256",
+        "sha384",
+        "sha512"
+      ]
+    },
+    {
+      "name": "file-hash",
+      "title": "文件哈希",
+      "description": "选取文件并计算 MD5 和 SHA 摘要。",
+      "mode": "view",
+      "keywords": [
+        "file",
+        "checksum",
+        "hash",
+        "md5",
+        "sha256"
+      ]
+    },
+    {
+      "name": "number-base",
+      "title": "进制转换",
+      "description": "在二、八、十、十六进制间转换整数。",
+      "mode": "view",
+      "keywords": [
+        "hex",
+        "binary",
+        "octal",
+        "decimal",
+        "radix"
+      ]
+    },
+    {
+      "name": "unicode-html",
+      "title": "Unicode 与 HTML 实体",
+      "description": "转换 Unicode 码位、UTF-8、UTF-16 和 HTML 实体。",
+      "mode": "view",
+      "keywords": [
+        "unicode",
+        "utf8",
+        "utf16",
+        "html",
+        "entity"
+      ]
+    }
+  ],
+  "name": "noah-codec",
+  "version": "0.5.0",
+  "scripts": {
+    "build": "node verify-github-install.mjs"
+  }
+}
