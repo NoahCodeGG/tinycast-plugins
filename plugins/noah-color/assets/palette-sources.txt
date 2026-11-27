@@ -1,0 +1,15 @@
+Palette source data (color labels and RGB hex values)
+- Chinese traditional colors: zhiming-chen/chinacolor, inst/extdata/chinacolor.json
+  https://github.com/zhiming-chen/chinacolor
+- Japanese traditional colors: xiaohk/nippon-colors, nippon_colors.json
+  https://github.com/xiaohk/nippon-colors
+- Flat UI: designmodo/Flat-UI, app/styles/_variables.scss
+  https://github.com/designmodo/Flat-UI
+- Fluent Design: microsoft/fluentui, packages/tokens/src/global/colors.ts
+  https://github.com/microsoft/fluentui
+- Open Color: yeun/open-color, open-color.json
+  https://github.com/yeun/open-color
+- Ant Design: @ant-design/colors 7.2.1, presetPalettes
+  https://github.com/ant-design/ant-design-colors
+- Material Design: google/material-design-lite, src/_color-definitions.scss
+  https://github.com/google/material-design-lite/tree/mdl-1.x
