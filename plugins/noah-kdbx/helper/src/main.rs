@@ -87,6 +87,10 @@ enum Operation {
         entry: String,
         history: Option<usize>,
     },
+    EditFields {
+        stamp: String,
+        entry: String,
+    },
     Preview {
         stamp: String,
         entry: String,
@@ -124,6 +128,9 @@ enum Operation {
 #[derive(Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 enum Management {
+    SetDefaultUsername {
+        username: String,
+    },
     AddGroup {
         parent: String,
         title: String,
@@ -199,7 +206,7 @@ struct Changes {
     title: Option<String>,
     username: Option<String>,
     url: Option<String>,
-    notes: Option<String>,
+    notes: Option<Zeroizing<String>>,
     group: Option<String>,
     tags: Option<Vec<String>>,
     color: Option<String>,
@@ -207,6 +214,23 @@ struct Changes {
     icon_file: Option<String>,
     otp: Option<Zeroizing<String>>,
     password: Option<Zeroizing<String>>,
+    #[serde(default)]
+    custom: Vec<CustomChange>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CustomChange {
+    original: Option<String>,
+    field: Option<EditedCustomField>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EditedCustomField {
+    name: String,
+    value: Zeroizing<String>,
+    protected: bool,
 }
 
 #[derive(Serialize)]
@@ -271,6 +295,14 @@ enum Response<'a> {
         writable: bool,
         database: Option<String>,
         backup: Option<String>,
+        default_username: Option<String>,
+        username_suggestions: Vec<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        saved_entry: Option<String>,
+    },
+    Editor {
+        fields: HashMap<&'static str, &'a str>,
+        custom: Vec<EditorCustomField<'a>>,
     },
     Details {
         versions: Vec<Version>,
@@ -291,6 +323,13 @@ enum Response<'a> {
     Error {
         code: &'static str,
     },
+}
+
+#[derive(Serialize)]
+struct EditorCustomField<'a> {
+    name: &'a str,
+    protected: bool,
+    value: &'a str,
 }
 
 fn regular_file(path: &str, limit: u64) -> io::Result<(File, Metadata)> {
@@ -714,6 +753,13 @@ fn custom_field(name: &str) -> bool {
 
 fn manage(database: &mut Database, change: &Management) -> Result<(), &'static str> {
     match change {
+        Management::SetDefaultUsername { username } => {
+            if username.chars().count() > 2_000 || username.chars().any(char::is_control) {
+                return Err("default_username");
+            }
+            database.meta.default_username = (!username.is_empty()).then(|| username.clone());
+            database.meta.default_username_changed = Some(Times::now());
+        }
         Management::SetCustom {
             entry,
             field,
@@ -1068,6 +1114,9 @@ fn run(req: &mut Request, output: &mut impl Write) -> Result<(), &'static str> {
                 icons: HashMap::new(),
                 writable: true,
                 backup: None,
+                default_username: None,
+                username_suggestions: Vec::new(),
+                saved_entry: None,
             },
         )
         .map_err(|_| "output");
@@ -1084,6 +1133,7 @@ fn run(req: &mut Request, output: &mut impl Write) -> Result<(), &'static str> {
         | Operation::SaveCopy { stamp, .. }
         | Operation::ManageCopy { stamp, .. }
         | Operation::Inspect { stamp, .. }
+        | Operation::EditFields { stamp, .. }
         | Operation::Export { stamp, .. }
         | Operation::Preview { stamp, .. }
             if *stamp != current_stamp =>
@@ -1169,6 +1219,7 @@ fn run(req: &mut Request, output: &mut impl Write) -> Result<(), &'static str> {
         }
     }
 
+    let mut saved_entry = None;
     if let Operation::SaveCopy { entry, fields, .. } = &req.operation {
         let id = match entry {
             Some(id) => Some(
@@ -1189,7 +1240,7 @@ fn run(req: &mut Request, output: &mut impl Write) -> Result<(), &'static str> {
         {
             return Err("too_many");
         }
-        if let Some(value) = &fields.otp {
+        if let Some(value) = fields.otp.as_ref().filter(|value| !value.is_empty()) {
             parse_otp(value)?;
         }
         let destination = fields
@@ -1209,6 +1260,7 @@ fn run(req: &mut Request, output: &mut impl Write) -> Result<(), &'static str> {
         let move_to = id
             .and(destination)
             .filter(|target| *target != entry.as_ref().parent().id());
+        saved_entry = Some(entry.as_ref().id().uuid().to_string());
         let mut entry = entry.track_changes();
         if let Some(target) = move_to {
             entry.move_to(target).map_err(|_| "group")?;
@@ -1224,10 +1276,10 @@ fn run(req: &mut Request, output: &mut impl Write) -> Result<(), &'static str> {
             entry.edit(|tracked| tracked.tags.clone_from(tags));
         }
         for (name, value) in [
-            (fields::TITLE, &fields.title),
-            (fields::USERNAME, &fields.username),
-            (fields::URL, &fields.url),
-            (fields::NOTES, &fields.notes),
+            (fields::TITLE, fields.title.as_deref()),
+            (fields::USERNAME, fields.username.as_deref()),
+            (fields::URL, fields.url.as_deref()),
+            (fields::NOTES, fields.notes.as_deref().map(String::as_str)),
         ] {
             if let Some(value) = value {
                 if name == fields::NOTES
@@ -1236,9 +1288,9 @@ fn run(req: &mut Request, output: &mut impl Write) -> Result<(), &'static str> {
                         .get(name)
                         .is_some_and(|value| value.is_protected())
                 {
-                    entry.set_protected(name, value.as_str());
+                    entry.set_protected(name, value);
                 } else {
-                    entry.set_unprotected(name, value.as_str());
+                    entry.set_unprotected(name, value);
                 }
             }
         }
@@ -1264,11 +1316,43 @@ fn run(req: &mut Request, output: &mut impl Write) -> Result<(), &'static str> {
             };
             entry.edit(|tracked| tracked.background_color = color);
         }
-        if let Some(value) = &fields.otp {
-            entry.set_protected(fields::OTP, value.as_str());
+        for (name, value) in [(fields::OTP, &fields.otp), (fields::PASSWORD, &fields.password)] {
+            if let Some(value) = value {
+                if value.is_empty() {
+                    entry.edit(|tracked| {
+                        tracked.fields.remove(name);
+                    });
+                } else {
+                    entry.set_protected(name, value.as_str());
+                }
+            }
         }
-        if let Some(value) = &fields.password {
-            entry.set_protected(fields::PASSWORD, value.as_str());
+        for change in &fields.custom {
+            if let Some(original) = &change.original {
+                if !custom_field(original) || !entry.fields.contains_key(original) {
+                    return Err("custom_field");
+                }
+                entry.edit(|tracked| {
+                    tracked.fields.remove(original);
+                });
+            }
+        }
+        for field in fields
+            .custom
+            .iter()
+            .filter_map(|change| change.field.as_ref())
+        {
+            if !custom_field(&field.name) || field.value.chars().count() > 2_000 {
+                return Err("custom_field");
+            }
+            if entry.fields.contains_key(&field.name) {
+                return Err("custom_exists");
+            }
+            if field.protected {
+                entry.set_protected(field.name.as_str(), field.value.as_str());
+            } else {
+                entry.set_unprotected(field.name.as_str(), field.value.as_str());
+            }
         }
     }
 
@@ -1286,6 +1370,7 @@ fn run(req: &mut Request, output: &mut impl Write) -> Result<(), &'static str> {
             let mut active_count = 0;
             let mut trash_count = 0;
             let mut listed = Vec::new();
+            let mut username_counts = HashMap::<String, usize>::new();
             let mut icons = HashMap::<String, String>::new();
             let mut icon_budget = 256 * 1024;
             for (entry, group, trashed) in entries(&database) {
@@ -1298,6 +1383,19 @@ fn run(req: &mut Request, output: &mut impl Write) -> Result<(), &'static str> {
                     active_count += 1;
                     if active_count > ENTRY_LIMIT {
                         return Err("too_many");
+                    }
+                    if let Some(username) = entry
+                        .fields
+                        .get(fields::USERNAME)
+                        .filter(|value| !value.is_protected())
+                        .map(|value| value.as_str())
+                        .filter(|value| {
+                            !value.trim().is_empty()
+                                && value.chars().count() <= 2_000
+                                && !value.chars().any(char::is_control)
+                        })
+                    {
+                        *username_counts.entry(username.to_owned()).or_default() += 1;
                     }
                 }
                 let icon = match entry.icon() {
@@ -1338,6 +1436,14 @@ fn run(req: &mut Request, output: &mut impl Write) -> Result<(), &'static str> {
                         .is_some_and(|note| !note.is_empty()),
                 });
             }
+            let mut usernames: Vec<_> = username_counts.into_iter().collect();
+            usernames
+                .sort_unstable_by(|(a, a_count), (b, b_count)| b_count.cmp(a_count).then(a.cmp(b)));
+            let username_suggestions = usernames
+                .into_iter()
+                .take(100)
+                .map(|(username, _)| username)
+                .collect();
             let (saved_database, new_stamp, backup) = match &req.operation {
                 Operation::SaveCopy { name, replace, .. }
                 | Operation::ManageCopy { name, replace, .. } => {
@@ -1391,9 +1497,38 @@ fn run(req: &mut Request, output: &mut impl Write) -> Result<(), &'static str> {
                     writable,
                     database: saved_database,
                     backup,
+                    default_username: database.meta.default_username.clone(),
+                    username_suggestions,
+                    saved_entry,
                 },
             )
             .map_err(|_| "output")
+        }
+        Operation::EditFields { entry, .. } => {
+            let entry = visible_entry(&database, entry)?;
+            let fields = [
+                ("title", fields::TITLE),
+                ("username", fields::USERNAME),
+                ("url", fields::URL),
+                ("notes", fields::NOTES),
+                ("password", fields::PASSWORD),
+                ("otp", fields::OTP),
+            ]
+            .into_iter()
+            .map(|(name, key)| (name, entry.get(key).unwrap_or_default()))
+            .collect();
+            let mut custom: Vec<_> = entry
+                .fields
+                .iter()
+                .filter(|(name, _)| custom_field(name))
+                .map(|(name, value)| EditorCustomField {
+                    name,
+                    protected: value.is_protected(),
+                    value: value.as_str(),
+                })
+                .collect();
+            custom.sort_by(|a, b| a.name.cmp(b.name));
+            serde_json::to_writer(output, &Response::Editor { fields, custom }).map_err(|_| "output")
         }
         Operation::Inspect { entry, history, .. } => {
             with_entry_version(&database, entry, *history, |entry| {

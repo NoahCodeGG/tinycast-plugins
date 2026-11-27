@@ -1,10 +1,10 @@
 import { Action, ActionPanel, clearSearchBar, Clipboard, Color, confirmAlert, Detail, Form, Icon, type Keyboard, List, LocalStorage, showToast, Toast } from "@raycast/api";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join } from "node:path";
-import { useEffect, useRef, useState } from "react";
-import { runHelper, VaultError, type Attachment, type Changes, type Credentials, type CustomField, type Entry, type EntryDetails, type Field, type Management, type Vault, type Version, type WriteOperation } from "../helper";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { runHelper, VaultError, type Attachment, type Changes, type Credentials, type CustomChange, type CustomField, type Entry, type EntryDetails, type EntryFields, type Field, type Management, type Vault, type Version, type WriteOperation } from "../helper";
 import { authorizeCloud, clearCloudAuth, providers, type CloudAuth, type Provider } from "../cloud-oauth";
 import { downloadCloud, remoteResource, uploadCloud, type CloudDrive } from "../cloud-drive";
 import { downloadWebDav, RemoteConflict, uploadWebDav, webDavConnection, type CancelRegistration, type WebDav } from "../webdav";
@@ -20,12 +20,28 @@ type RemoteBinding = { cloud: CloudDrive } | { webDav: WebDav };
 type UnlockValues = { master?: string };
 type RecentVault = { path: string; keyfile?: string };
 type CreateValues = { master: string; confirmation: string; name: string };
-type EditValues = { name: string; title: string; username: string; url: string; notes: string; otp: string; secret: string; group: string; tags: string; color: string; icon: string; iconFile: string[] };
-type ManageValues = { name: string; title?: string; group?: string; parent?: string; files?: string[]; field?: string; customValue?: string; protected?: boolean };
+type EditValues = EntryFields & { name?: string; group: string; tags: string; color: string; icon: string; iconFile?: string[] };
+type EditableCustomField = NonNullable<CustomChange["field"]>;
+type CustomDraft = { original?: EditableCustomField; field: EditableCustomField; removed?: boolean };
+type EntryEdit = {
+  entry?: Entry;
+  original: EntryFields;
+  initialTitle?: string;
+  username: string;
+  filterUsernames?: boolean;
+  password: string;
+  group: string;
+  custom: CustomDraft[];
+  showPassword?: boolean;
+  saveAs?: boolean;
+};
+const emptyEntryFields: EntryFields = { title: "", username: "", url: "", notes: "", password: "", otp: "" };
+type ManageValues = { name?: string; username?: string; title?: string; group?: string; parent?: string; files?: string[]; field?: string; customValue?: string; protected?: boolean };
 type ManageForm = { kind: Management["kind"]; entry?: Entry; version?: Version; attachment?: Attachment; custom?: CustomField };
 type Inspector = { entry: Entry; mode: "history" | "attachments" | "custom"; details: EntryDetails; version?: Version };
 type ExportValues = { name: string; directory: string[] };
 const managementTitles: Record<ManageForm["kind"], string> = {
+  set_default_username: "设置默认用户名",
   add_group: "新建分组",
   rename_group: "重命名分组",
   move_group: "移动分组",
@@ -120,7 +136,6 @@ export default function OpenKdbx() {
   const [creating, setCreating] = useState(false);
   const [directory, setDirectory] = useState<string[]>([]);
   const [generator, setGenerator] = useState(false);
-  const [secret, setSecret] = useState("");
   const [length, setLength] = useState("24");
   const [upper, setUpper] = useState(true);
   const [lower, setLower] = useState(true);
@@ -156,7 +171,7 @@ export default function OpenKdbx() {
   const [exporting, setExporting] = useState<Attachment>();
   const [management, setManagement] = useState<ManageForm>();
   const [trash, setTrash] = useState(false);
-  const [edit, setEdit] = useState<{ entry?: Entry; draft?: Pick<EditValues, "title" | "username" | "url" | "name" | "group" | "tags" | "color" | "icon"> }>();
+  const [edit, setEdit] = useState<EntryEdit>();
   const [group, setGroup] = useState(allGroups);
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
@@ -252,7 +267,6 @@ export default function OpenKdbx() {
     setExporting(undefined);
     setPreview(undefined);
     setTrash(false);
-    setSecret("");
     setGenerator(false);
     setCreating(false);
     setGroup(allGroups);
@@ -362,7 +376,6 @@ export default function OpenKdbx() {
       setInspector(undefined);
       setExporting(undefined);
       setPreview(undefined);
-      setSecret("");
       setGenerator(false);
       setTrash(false);
       void resetFilters();
@@ -916,6 +929,7 @@ export default function OpenKdbx() {
   }
 
   function generate() {
+    if (job.current) return;
     const count = Number(length);
     if (!Number.isInteger(count) || count < 12 || count > 128) {
       setError("密码长度须为 12 到 128 个字符。");
@@ -931,52 +945,78 @@ export default function OpenKdbx() {
       setError("请至少选择一种字符。");
       return;
     }
+    const pick = (characters: string) => characters[randomInt(characters.length)];
     const alphabet = categories.join("");
-    const ceiling = 256 - (256 % alphabet.length);
-    let candidate = "";
-    while (candidate.length < count) {
-      const bytes = randomBytes(count);
-      for (const byte of bytes) {
-        if (byte < ceiling) candidate += alphabet[byte % alphabet.length];
-        if (candidate.length === count) break;
-      }
-      bytes.fill(0);
+    const candidate = categories.map(pick);
+    while (candidate.length < count) candidate.push(pick(alphabet));
+    for (let index = candidate.length - 1; index > 0; index--) {
+      const other = randomInt(index + 1);
+      [candidate[index], candidate[other]] = [candidate[other], candidate[index]];
     }
-    setSecret(candidate);
+    const password = candidate.join("");
+    setEdit((draft) => draft && { ...draft, password });
     setGenerator(false);
     setError("");
     renew();
   }
 
-  function beginEdit(entry?: Entry, session = currentSession) {
-    if (!session?.vault.writable || !credentialsByPath.current.has(session.path) || job.current) return;
+  async function beginEdit(entry?: Entry, session = currentSession, initialTitle?: string) {
+    if (!session?.vault.writable || job.current) return;
+    const credentials = credentialsByPath.current.get(session.path);
+    if (!credentials) return;
+    const destination = entry?.group_id || group || session.vault.groups.find(({ root }) => root)?.id || "";
     if (unified) void openSession(session.path, entry);
     renew();
     setError("");
-    setSecret("");
     setGenerator(false);
-    setEdit({ entry });
+    if (!entry) {
+      setEdit({ original: emptyEntryFields, initialTitle, group: destination,
+        username: session.vault.default_username ?? "", password: "", custom: [] });
+      return;
+    }
+    setBusy(true);
+    let task: { cancel: () => void } | undefined;
+    try {
+      const pending = runHelper(credentials, { kind: "edit_fields", stamp: session.vault.stamp, entry: entry.id });
+      job.current = task = pending;
+      const { fields, custom } = await pending.result;
+      if (job.current === task) {
+        setEdit({ entry, original: fields, group: destination, username: fields.username, password: fields.password,
+          custom: custom.map((field) => ({ original: field, field })) });
+      }
+    } catch (failure) {
+      reportReadFailure(failure, task, credentials);
+    } finally {
+      finishRead(task, credentials);
+    }
   }
 
-  async function save(values: EditValues, replace = false) {
+  function updateCustomDraft(index: number, update: (draft: CustomDraft) => CustomDraft) {
+    setEdit((draft) => draft && { ...draft, custom: draft.custom.map((field, i) => i === index ? update(field) : field) });
+    renew();
+  }
+
+  async function save(values: EditValues, replace: boolean) {
     const credentials = credentialsByPath.current.get(activePath);
     if (!credentials || !vault?.writable || !edit || job.current) return;
     const original = edit.entry;
     const title = values.title.trim();
-    const name = values.name.trim();
+    const name = values.name?.trim() ?? "";
     if (!title) { setError("请输入条目标题。"); return; }
     if (!replace && (!name.toLowerCase().endsWith(".kdbx") || /[/:]/.test(name))) {
       setError("请输入副本文件名，例如 工作-编辑版.kdbx。");
       return;
     }
-    if ([values.title, values.username, values.url, values.notes, values.otp, values.secret ?? ""].some((value) => value.length > 2_000)) {
-      setError("每个条目字段最多支持 2,000 个字符。");
-      return;
-    }
     const fields: Changes = {};
-    if (values.title !== original?.title) fields.title = title;
-    if (values.username !== original?.username) fields.username = values.username;
-    if (values.url !== original?.url) fields.url = values.url;
+    for (const key of Object.keys(emptyEntryFields) as (keyof EntryFields)[]) {
+      const value = key === "password" || key === "username" ? edit[key] : values[key];
+      if (value === edit.original[key]) continue;
+      if ([...value].length > 2_000) {
+        setError("每个新增或修改的条目字段最多支持 2,000 个字符。");
+        return;
+      }
+      fields[key] = key === "title" ? title : key === "otp" ? value.trim() : value;
+    }
     if (values.group && values.group !== original?.group_id) fields.group = values.group;
     const tags = values.tags ?? "";
     if (tags !== (original?.tags.join("; ") ?? "")) {
@@ -990,16 +1030,44 @@ export default function OpenKdbx() {
     if (color !== (original?.color ?? "")) fields.color = color;
     if (values.iconFile?.[0]) fields.icon_file = values.iconFile[0];
     else if (values.icon && values.icon !== "keep") fields.icon = values.icon;
-    if (values.notes) fields.notes = values.notes;
-    if (values.otp.trim()) fields.otp = values.otp.trim();
-    if (values.secret) fields.password = values.secret;
-    values.secret = "";
-    if (!Object.keys(fields).length) {
-      setError("修改至少一个字段后再保存副本。");
+    const custom: CustomChange[] = [];
+    const names = new Set<string>();
+    for (const draft of edit.custom) {
+      if (draft.removed) {
+        if (draft.original) custom.push({ original: draft.original.name });
+        continue;
+      }
+      const field = { ...draft.field, name: draft.field.name === draft.original?.name ? draft.field.name : draft.field.name.trim() };
+      if (!draft.original && !field.name && !field.value) continue;
+      if (!field.name || [...field.name].length > 128 || /[\x00-\x1f\x7f]/.test(field.name)
+          || /^(title|username|password|url|notes|otp)$/i.test(field.name)) {
+        setError("自定义字段名称须为 1 到 128 个字符，且不能使用内置字段名。");
+        return;
+      }
+      if (names.has(field.name)) {
+        setError("自定义字段名称不能重复。");
+        return;
+      }
+      names.add(field.name);
+      if (draft.original && field.name === draft.original.name && field.value === draft.original.value && field.protected === draft.original.protected) continue;
+      if ([...field.value].length > 2_000) {
+        setError("每个新增或修改的自定义字段值最多支持 2,000 个字符。");
+        return;
+      }
+      custom.push({ original: draft.original?.name, field });
+    }
+    if (custom.length) fields.custom = custom;
+    if (replace && !Object.keys(fields).length) {
+      closeEditor();
       return;
     }
-    setEdit({ entry: original, draft: { title: values.title, username: values.username, url: values.url, name, group: values.group, tags, color: values.color, icon: values.icon } });
     await writeCopy({ kind: "save_copy", stamp: vault.stamp, name, replace, entry: original?.id, fields });
+  }
+
+  function closeEditor() {
+    setEdit(undefined);
+    setGenerator(false);
+    setError("");
   }
 
   async function inspect(entry: Entry, mode: Inspector["mode"], version?: Version) {
@@ -1100,14 +1168,21 @@ export default function OpenKdbx() {
 
   async function saveManagement(values: ManageValues, replace = false) {
     if (!vault || !management || job.current) return;
-    const name = values.name.trim();
+    const name = values.name?.trim() ?? "";
     if (!replace && (!name.toLowerCase().endsWith(".kdbx") || /[/:]/.test(name))) {
       setError("请输入有效的副本文件名。");
       return;
     }
     const { kind, entry, version, attachment, custom } = management;
     let change: Management;
-    if (kind === "add_group" || kind === "rename_group") {
+    if (kind === "set_default_username") {
+      const username = values.username ?? "";
+      if (username === (vault.default_username ?? "")) {
+        setManagement(undefined);
+        return;
+      }
+      change = { kind, username };
+    } else if (kind === "add_group" || kind === "rename_group") {
       const title = values.title?.trim() ?? "";
       if (!title || [...title].length > 128 || !values.group) {
         setError("请选择分组，并输入 1 到 128 个字符的名称。");
@@ -1154,7 +1229,7 @@ export default function OpenKdbx() {
   async function writeCopy(operation: WriteOperation) {
     const credentials = credentialsByPath.current.get(activePath);
     if (!credentials || job.current) return;
-    if (operation.replace) {
+    if (operation.replace && operation.kind === "manage_copy" && operation.change.kind !== "set_default_username") {
       const confirmed = await confirmAlert({
         title: "更新当前密码库？",
         message: "旧版本将作为加密备份留在同一目录。",
@@ -1165,25 +1240,28 @@ export default function OpenKdbx() {
     renew();
     setBusy(true);
     setError("");
-    let saved: Vault | undefined;
+    let saved: { credentials: Credentials; vault: Vault } | undefined;
     try {
       const task = runHelper(credentials, operation);
       if (operation.kind === "save_copy") {
         delete operation.fields.password;
         delete operation.fields.notes;
         delete operation.fields.otp;
-        setSecret("");
+        delete operation.fields.custom;
       } else if (operation.change.kind === "set_custom") {
         operation.change.value = "";
       }
       job.current = task;
       const result = await task.result;
       if (job.current !== task || !result.database) return;
-      const replaced = credentials.database;
-      credentials.database = result.database;
-      register(credentials, result, replaced);
-      saved = result;
-      setEdit(undefined);
+      const copy = operation.kind === "save_copy" && !operation.replace;
+      const destination = copy ? { ...credentials } : credentials;
+      const replaced = copy ? undefined : credentials.database;
+      destination.database = result.database;
+      register(destination, result, replaced);
+      if (result.saved_entry) setSelectedEntry(`${result.database}:${result.saved_entry}`);
+      saved = { credentials: destination, vault: result };
+      closeEditor();
       setManagement(undefined);
       setInspector(undefined);
       await resetFilters();
@@ -1204,7 +1282,7 @@ export default function OpenKdbx() {
         setBusy(false);
       }
     }
-    if (saved) await syncAfterSave(credentials, saved);
+    if (saved) await syncAfterSave(saved.credentials, saved.vault);
   }
 
   const lockAction = <Action title={sessions.length > 1 ? "锁定所有密码库" : "锁定密码库"} icon={Icon.Lock} onAction={() => lock()} shortcut={commandKey("l")} />;
@@ -1223,6 +1301,19 @@ export default function OpenKdbx() {
     const title = managementTitles[kind];
     const destructive = kind === "purge_entry" || kind === "purge_group" || kind === "delete_history" || kind === "remove_attachment" || kind === "remove_custom";
     const submitTitle = destructive ? "确认永久删除并保存副本" : "保存为加密副本";
+    if (kind === "set_default_username") {
+      return (
+        <Form key={kind} navigationTitle={title} isLoading={busy} actions={<ActionPanel>
+          {!busy && <Action.SubmitForm<ManageValues> title="保存默认用户名" shortcut={saveKey} onSubmit={(values) => saveManagement(values, true)} />}
+          {!busy && <Action title="取消" shortcut={backKey} onAction={() => { setManagement(undefined); setError(""); }} />}
+          {lockAction}
+        </ActionPanel>}>
+          <Form.TextField id="username" title="默认用户名" defaultValue={vault.default_username ?? ""} autoFocus
+            info="用于此密码库的新条目。清空后可取消默认值。" storeValue={false} onChange={renew} />
+          {error && <Form.Description title="状态" text={error} />}
+        </Form>
+      );
+    }
     return (
       <Form key={kind} navigationTitle={title} isLoading={busy} actions={<ActionPanel>
         {!busy && <Action.SubmitForm<ManageValues> title={submitTitle} shortcut={destructive ? undefined : saveCopyKey}
@@ -1344,58 +1435,110 @@ export default function OpenKdbx() {
 
   if (vault && edit) {
     const entry = edit.entry;
-    const draft = edit.draft;
     const existingColor = entry?.color;
     const options = existingColor && !entryColors.some(({ value }) => value === existingColor)
       ? [...entryColors, { title: existingColor, value: existingColor }]
       : entryColors;
+    const PasswordInput = edit.showPassword ? Form.TextField : Form.PasswordField;
+    const usernames = new Set([vault.default_username ?? "", ...vault.username_suggestions]);
+    usernames.delete("");
+    const usernameQuery = edit.filterUsernames ? edit.username.toLowerCase() : "";
+    const usernameOptions = [...usernames].filter((username) => username.toLowerCase().includes(usernameQuery));
+    const updateUsername = (username: string, filterUsernames: boolean) => {
+      setEdit((draft) => draft && { ...draft, username, filterUsernames });
+      renew();
+    };
     return (
       <Form
-        navigationTitle={entry ? "编辑条目" : "新建条目"}
+        key="entry-editor"
+        navigationTitle={(entry ? "编辑条目" : "新建条目") + " · " + basename(activePath)}
         isLoading={busy}
         actions={<ActionPanel>
-          {!busy && <Action.SubmitForm<EditValues> title="保存为加密副本" shortcut={saveCopyKey} onSubmit={save} />}
-          {!busy && <Action.SubmitForm<EditValues> title="更新当前库并备份" shortcut={saveKey} onSubmit={(values) => save(values, true)} />}
-          {lockAction}
-          {!busy && <Action title={generator ? "生成并填入密码" : "密码生成器"} shortcut={commandKey("g")} onAction={() => {
-            if (generator) generate();
-            else setGenerator(true);
+          {!busy && <Action.SubmitForm<EditValues> title="保存条目" shortcut={saveKey} onSubmit={(values) => save(values, true)} />}
+          {!busy && (edit.saveAs
+            ? <Action.SubmitForm<EditValues> title="保存为加密副本" shortcut={saveCopyKey} onSubmit={(values) => save(values, false)} />
+            : <Action title="另存为加密副本…" shortcut={saveCopyKey} onAction={() => {
+                setEdit((draft) => draft && { ...draft, saveAs: true });
+                renew();
+              }} />)}
+          {!busy && <Action title="生成并填入密码" icon={Icon.Key} shortcut={commandKey("g")} onAction={generate} />}
+          {!busy && <Action title={generator ? "收起生成设置" : "密码生成设置"} shortcut={commandKey("g", "shift")} onAction={() => {
+            setGenerator(!generator);
+            renew();
           }} />}
-          {!busy && <Action title="取消编辑" shortcut={backKey} onAction={() => { setEdit(undefined); setSecret(""); setGenerator(false); setError(""); }} />}
+          {!busy && <Action title={edit.showPassword ? "隐藏密码" : "显示密码"} onAction={() => {
+            setEdit((draft) => draft && { ...draft, showPassword: !draft.showPassword });
+            renew();
+          }} />}
+          {!busy && <Action title="添加自定义字段" shortcut={commandKey("n")} onAction={() => {
+            setEdit((draft) => draft && { ...draft, custom: [...draft.custom, { field: { name: "", value: "", protected: false } }] });
+            renew();
+          }} />}
+          {!busy && <Action title="取消编辑" shortcut={backKey} onAction={closeEditor} />}
+          {lockAction}
+          {!busy && usernameOptions.length > 0 && (
+            <ActionPanel.Section>
+              <ActionPanel.Submenu title="常用用户名" icon={Icon.Person}>
+                {usernameOptions.map((username) => (
+                  <Action key={username} icon={Icon.Person}
+                    title={`使用用户名 ${username}${username === vault.default_username ? "（默认）" : ""}`}
+                    onAction={() => updateUsername(username, false)} />
+                ))}
+              </ActionPanel.Submenu>
+            </ActionPanel.Section>
+          )}
         </ActionPanel>}
       >
-        {busy ? <Form.Description title="正在保存" text="正在写入加密 KDBX 副本…" /> : <>
-          <Form.TextField id="title" title="标题" defaultValue={draft?.title ?? entry?.title ?? ""} onChange={renew} autoFocus />
-          <Form.TextField id="username" title="用户名" defaultValue={draft?.username ?? entry?.username ?? ""} onChange={renew} />
-          <Form.TextField id="url" title="网址" defaultValue={draft?.url ?? entry?.url ?? ""} onChange={renew} />
-          <Form.Dropdown id="group" title="分组" defaultValue={draft?.group || entry?.group_id || group || activeGroups[0]?.id} onChange={renew}>
-            {activeGroups.map((item) => <Form.Dropdown.Item key={item.id} value={item.id} title={item.path || "根分组"} />)}
-          </Form.Dropdown>
-          <Form.TextField id="tags" title="标签" defaultValue={draft?.tags ?? entry?.tags.join("; ") ?? ""} placeholder="工作; 常用" onChange={renew} />
-          <Form.Dropdown id="color" title="颜色" defaultValue={draft?.color || existingColor || "none"} onChange={renew}>
-            {options.map(({ title, value }) => <Form.Dropdown.Item key={value} title={title} value={value} />)}
-          </Form.Dropdown>
-          <Form.Dropdown id="icon" title="图标" defaultValue={draft?.icon || "keep"} onChange={renew}>
-            <Form.Dropdown.Item value="keep" title="保持当前图标" />
-            <Form.Dropdown.Item value="none" title="清除图标" />
-            {entryIcons.map(({ title, value, image }) => <Form.Dropdown.Item key={value} title={title} value={value} icon={image} />)}
-          </Form.Dropdown>
-          <Form.FilePicker id="iconFile" title="自定义图标文件（可选）" allowMultipleSelection={false} onChange={renew} />
-          <Form.PasswordField id="secret" title={entry ? "新密码（留空保留原密码）" : "密码"} storeValue={false} value={secret}
-            onChange={(value) => { setSecret(value); renew(); }} />
-          {generator && <>
-            <Form.TextField id="length" title="密码长度" value={length} onChange={setLength} />
-            <Form.Checkbox id="upper" label="包含大写字母" value={upper} onChange={setUpper} />
-            <Form.Checkbox id="lower" label="包含小写字母" value={lower} onChange={setLower} />
-            <Form.Checkbox id="digits" label="包含数字" value={digits} onChange={setDigits} />
-            <Form.Checkbox id="symbols" label="包含符号" value={symbols} onChange={setSymbols} />
-          </>}
-          <Form.PasswordField id="otp" title="TOTP 链接（选填）" placeholder="otpauth://totp/…" storeValue={false} onChange={renew} />
-          <Form.TextArea id="notes" title={entry ? "新备注（留空保留原备注）" : "备注"} storeValue={false} onChange={renew} />
-          <Form.TextField id="name" title="副本文件名" defaultValue={draft?.name ?? defaultCopy} onChange={renew} />
-          <Form.Description text="标签以分号分隔。副本保存在原库所在目录。" />
-          {error && <Form.Description title="状态" text={error} />}
+        {error && <Form.Description title="状态" text={error} />}
+        {edit.saveAs && <Form.TextField id="name" title="加密副本文件名" defaultValue={defaultCopy} storeValue={false} onChange={renew}
+          info="副本保存在当前密码库所在目录。" />}
+        <Form.TextField id="title" title="标题" defaultValue={edit.initialTitle ?? edit.original.title} storeValue={false} onChange={renew} autoFocus />
+        <Form.TextField id="username" title="用户名" value={edit.username} storeValue={false}
+          info={usernames.size > 0 ? "⌘K 可选择常用用户名。输入时筛选，清空后显示全部候选。" : undefined}
+          onChange={(username) => updateUsername(username, true)} />
+        <PasswordInput id="password" title="密码" storeValue={false} value={edit.password}
+          onChange={(password) => {
+            setEdit((draft) => draft && { ...draft, password });
+            renew();
+          }} />
+        {generator && <>
+          <Form.TextField id="length" title="密码长度" value={length} storeValue={false} onChange={(value) => { setLength(value); renew(); }} />
+          <Form.Checkbox id="upper" label="包含大写字母" value={upper} onChange={(value) => { setUpper(value); renew(); }} />
+          <Form.Checkbox id="lower" label="包含小写字母" value={lower} onChange={(value) => { setLower(value); renew(); }} />
+          <Form.Checkbox id="digits" label="包含数字" value={digits} onChange={(value) => { setDigits(value); renew(); }} />
+          <Form.Checkbox id="symbols" label="包含符号" value={symbols} onChange={(value) => { setSymbols(value); renew(); }} />
         </>}
+        <Form.TextField id="url" title="网址" defaultValue={edit.original.url} storeValue={false} onChange={renew} />
+        <Form.TextArea id="notes" title="备注" defaultValue={edit.original.notes} storeValue={false} onChange={renew} />
+        <Form.Dropdown id="group" title="分组" defaultValue={edit.group} storeValue={false} onChange={renew}>
+          {activeGroups.map((item) => <Form.Dropdown.Item key={item.id} value={item.id} title={item.path || "根分组"} />)}
+        </Form.Dropdown>
+        <Form.TextField id="tags" title="标签" defaultValue={entry?.tags.join("; ") ?? ""} placeholder="工作; 常用" storeValue={false} onChange={renew} />
+        <Form.PasswordField id="otp" title="TOTP 链接" placeholder="otpauth://totp/…" defaultValue={edit.original.otp} storeValue={false} onChange={renew} />
+        {edit.custom.length > 0 && <Form.Separator />}
+        {edit.custom.map((draft, index) => {
+          const update = (field: Partial<EditableCustomField>) => updateCustomDraft(index, (draft) => ({ ...draft, field: { ...draft.field, ...field } }));
+          const Input = draft.field.protected ? Form.PasswordField : Form.TextField;
+          return <Fragment key={index}>
+            {!draft.removed && <>
+              <Form.TextField id={`custom-name-${index}`} title="自定义字段名称" value={draft.field.name} storeValue={false} onChange={(name) => update({ name })} />
+              <Input id={`custom-value-${index}`} title="字段值" value={draft.field.value} storeValue={false} onChange={(value) => update({ value })} />
+              <Form.Checkbox id={`custom-protected-${index}`} label="保护字段值" value={draft.field.protected} storeValue={false} onChange={(protectedValue) => update({ protected: protectedValue })} />
+            </>}
+            <Form.Checkbox id={`custom-removed-${index}`} label={`保存时删除字段${draft.field.name ? " · " + draft.field.name : ""}`}
+              value={Boolean(draft.removed)} storeValue={false} onChange={(removed) => updateCustomDraft(index, (draft) => ({ ...draft, removed }))} />
+          </Fragment>;
+        })}
+        <Form.Separator />
+        <Form.Dropdown id="color" title="颜色" defaultValue={existingColor || "none"} storeValue={false} onChange={renew}>
+          {options.map(({ title, value }) => <Form.Dropdown.Item key={value} title={title} value={value} />)}
+        </Form.Dropdown>
+        <Form.Dropdown id="icon" title="图标" defaultValue="keep" storeValue={false} onChange={renew}>
+          <Form.Dropdown.Item value="keep" title={entry ? "保持当前图标" : "默认图标"} />
+          <Form.Dropdown.Item value="none" title="清除图标" />
+          {entryIcons.map(({ title, value, image }) => <Form.Dropdown.Item key={value} title={title} value={value} icon={image} />)}
+        </Form.Dropdown>
+        <Form.FilePicker id="iconFile" title="自定义图标文件（可选）" allowMultipleSelection={false} storeValue={false} onChange={renew} />
       </Form>
     );
   }
@@ -1604,7 +1747,23 @@ export default function OpenKdbx() {
     renew();
     void clearSearchBar();
   }
-  const newAction = vault.writable && !trash && !unified && <Action title="新建条目" icon={Icon.Plus} shortcut={commandKey("n")} onAction={() => beginEdit()} />;
+  const terms = searchTerms(query);
+  const entries = (unified ? sessions : sessions.filter(({ path }) => path === activePath)).flatMap((session) =>
+    session.vault.entries.filter((entry) => {
+      if (trash !== entry.trashed || (group && group !== entry.group_id)) return false;
+      if (advancedMatches && !advancedMatches.has(session.path + ":" + entry.id)) return false;
+      if (!terms.length) return true;
+      return matchesSearch({
+        title: entry.title, user: entry.username, url: entry.url, group: entry.group,
+        tag: entry.tags.join("\n"), vault: basename(session.path),
+        color: entry.color ? `${entry.color} ${entryColors.find(({ value }) => value === entry.color)?.title ?? ""}` : "",
+      }, terms);
+    }).map((entry) => ({ entry, session })),
+  ).sort((a, b) => a.entry.title.localeCompare(b.entry.title) || a.session.path.localeCompare(b.session.path));
+  const initialTitle = terms.length > 0 && entries.length === 0 ? query.trim() : undefined;
+  const newAction = vault.writable && !trash && !unified && (
+    <Action title="新建条目" icon={Icon.Plus} shortcut={commandKey("n")} onAction={() => beginEdit(undefined, currentSession, initialTitle)} />
+  );
   const groups = activeGroups;
   const binding = unified ? undefined : remoteBinding(activePath);
   const remote = binding && ("cloud" in binding ? binding.cloud : binding.webDav);
@@ -1612,6 +1771,7 @@ export default function OpenKdbx() {
   const statusSuffix = status ? " · " + status.text : "";
   const vaultActions = <>
     {newAction}
+    {vault.writable && !trash && !unified && <Action title="设置默认用户名" icon={Icon.Person} onAction={() => beginManagement({ kind: "set_default_username" })} />}
     {vault.writable && !trash && !unified && <Action title="更改主密码或密钥" shortcut={commandKey("p", "shift")} icon={Icon.Key} onAction={() => {
       if (job.current) return;
       renew();
@@ -1660,19 +1820,6 @@ export default function OpenKdbx() {
     }} />}
     {lockAction}
   </>;
-  const terms = searchTerms(query);
-  const entries = (unified ? sessions : sessions.filter(({ path }) => path === activePath)).flatMap((session) =>
-    session.vault.entries.filter((entry) => {
-      if (trash !== entry.trashed || (group && group !== entry.group_id)) return false;
-      if (advancedMatches && !advancedMatches.has(session.path + ":" + entry.id)) return false;
-      if (!terms.length) return true;
-      return matchesSearch({
-        title: entry.title, user: entry.username, url: entry.url, group: entry.group,
-        tag: entry.tags.join("\n"), vault: basename(session.path),
-        color: entry.color ? `${entry.color} ${entryColors.find(({ value }) => value === entry.color)?.title ?? ""}` : "",
-      }, terms);
-    }).map((entry) => ({ entry, session })),
-  ).sort((a, b) => a.entry.title.localeCompare(b.entry.title) || a.session.path.localeCompare(b.session.path));
 
   if (tableView) {
     const rows = entries.slice(0, 150).map(({ entry, session }) => {
@@ -1714,7 +1861,8 @@ export default function OpenKdbx() {
       isShowingDetail={entries.length > 0}
       actions={<ActionPanel>{vaultActions}</ActionPanel>}
     >
-      <List.EmptyView title={terms.length || group || advancedMatches ? "没有匹配的条目" : trash ? "回收站为空" : "密码库中没有可显示的条目"} />
+      <List.EmptyView title={terms.length || group || advancedMatches ? "没有匹配的条目" : trash ? "回收站为空" : "密码库中没有可显示的条目"}
+        description={newAction && initialTitle ? "按 ⌘N 以搜索内容为标题新建条目。" : undefined} />
       {entries.slice(0, 150).map(({ entry, session }) => {
         const ownerStatus = unified ? syncStatus(session) : undefined;
         return (

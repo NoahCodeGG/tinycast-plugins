@@ -23,13 +23,17 @@ export type Entry = {
   has_attachments: boolean;
 };
 
-export type Changes = Partial<Record<"title" | "otp" | "group" | "color" | "icon" | "icon_file" | Exclude<Field, "totp">, string>> & { tags?: string[] };
+export type EntryFields = Record<"title" | "username" | "url" | "notes" | "password" | "otp", string>;
+export type CustomChange = { original?: string; field?: { name: string; value: string; protected: boolean } };
+type EntryEditorData = { kind: "editor"; fields: EntryFields; custom: (CustomField & { value: string })[] };
+export type Changes = Partial<EntryFields & Record<"group" | "color" | "icon" | "icon_file", string>> & { tags?: string[]; custom?: CustomChange[] };
 export type Group = { id: string; name: string; path: string; root: boolean; trashed: boolean; recycle_bin: boolean };
 export type Version = { index: number; has_attachments: boolean; title: string; username: string; modified: string | null };
 export type Attachment = { name: string; size: number };
 export type CustomField = { name: string; protected: boolean; value: string | null };
 export type EntryDetails = { kind: "details"; versions: Version[]; attachments: Attachment[]; custom: CustomField[] };
 export type Management =
+  | { kind: "set_default_username"; username: string }
   | { kind: "add_group"; parent: string; title: string }
   | { kind: "rename_group"; group: string; title: string }
   | { kind: "move_group"; group: string; parent: string }
@@ -40,7 +44,7 @@ export type Management =
   | { kind: "set_custom"; entry: string; field: string; value: string; protected: boolean; existing: boolean }
   | { kind: "remove_custom"; entry: string; field: string }
   | { kind: "restore_history" | "delete_history"; entry: string; index: number };
-export type Vault = { kind: "list"; stamp: string; entries: Entry[]; groups: Group[]; icons: Record<string, string>; writable: boolean; database?: string; backup?: string | null };
+export type Vault = { kind: "list"; stamp: string; entries: Entry[]; groups: Group[]; icons: Record<string, string>; writable: boolean; database?: string; backup?: string | null; saved_entry?: string; default_username: string | null; username_suggestions: string[] };
 export type WriteOperation =
   | { kind: "save_copy"; stamp: string; name: string; replace?: boolean; entry?: string; fields: Changes }
   | { kind: "manage_copy"; stamp: string; name: string; replace?: boolean; change: Management };
@@ -53,10 +57,11 @@ type Operation =
   | { kind: "rekey"; stamp: string; name: string; new_master: string; new_keyfile?: string }
   | { kind: "merge"; stamp: string; name: string; remote: string }
   | { kind: "inspect"; stamp: string; entry: string; history?: number }
+  | { kind: "edit_fields"; stamp: string; entry: string }
   | { kind: "preview"; stamp: string; entry: string; attachment: string; history?: number }
   | { kind: "export"; stamp: string; entry: string; attachment: string; history?: number; directory: string; name: string }
   | WriteOperation;
-type Replies = { list: Vault; create: Vault; rekey: Vault; merge: Vault; save_copy: Vault; manage_copy: Vault; read: { kind: "value"; value: string }; read_custom: { kind: "value"; value: string }; search: { kind: "matches"; ids: string[] }; inspect: EntryDetails; export: { kind: "exported" }; preview: { kind: "preview"; mime: "image/png" | "image/jpeg"; data: string } };
+type Replies = { list: Vault; create: Vault; rekey: Vault; merge: Vault; save_copy: Vault; manage_copy: Vault; read: { kind: "value"; value: string }; read_custom: { kind: "value"; value: string }; search: { kind: "matches"; ids: string[] }; inspect: EntryDetails; edit_fields: EntryEditorData; export: { kind: "exported" }; preview: { kind: "preview"; mime: "image/png" | "image/jpeg"; data: string } };
 const messages = new Map([
   ["database_file", "无法读取密码库。请确认文件已下载到本机、可以读取且不超过 128 MiB。"],
   ["keyfile", "无法读取密钥文件，请检查文件位置和格式。"],
@@ -80,6 +85,7 @@ const messages = new Map([
   ["group", "找不到可用的分组。"],
   ["group_move", "无法移动该分组。请选择根分组或其他有效上级。"],
   ["group_name", "分组名称须为 1 到 128 个字符。"],
+  ["default_username", "默认用户名最多 2,000 个字符，且不能包含换行或控制字符。"],
   ["tags", "每条记录最多 64 个标签，每个标签最多 128 个字符。"],
   ["history", "找不到这条历史版本。"],
   ["attachment", "找不到这个附件。"],
@@ -143,9 +149,18 @@ export function runHelper<T extends Operation>(credentials: Credentials, operati
             || operation.kind === "merge";
           if (expectsVault && response.kind === "list" && typeof response.stamp === "string"
               && typeof response.writable === "boolean" && Array.isArray(response.entries) && Array.isArray(response.groups) && response.icons && typeof response.icons === "object"
+              && (response.default_username === null || typeof response.default_username === "string")
+              && Array.isArray(response.username_suggestions) && response.username_suggestions.every((value: unknown) => typeof value === "string")
               && (operation.kind === "list" || typeof response.database === "string")
               || (operation.kind === "read" || operation.kind === "read_custom") && response.kind === "value" && typeof response.value === "string"
               || operation.kind === "inspect" && response.kind === "details" && Array.isArray(response.versions) && Array.isArray(response.attachments) && Array.isArray(response.custom)
+              || operation.kind === "edit_fields" && response.kind === "editor" && response.fields
+                && ["title", "username", "url", "notes", "password", "otp"].every((key) => typeof response.fields[key] === "string")
+                && Array.isArray(response.custom) && response.custom.every((field: unknown) => {
+                  if (!field || typeof field !== "object") return false;
+                  const { name, value, protected: concealed } = field as CustomField;
+                  return typeof name === "string" && typeof value === "string" && typeof concealed === "boolean";
+                })
               || operation.kind === "search" && response.kind === "matches" && Array.isArray(response.ids)
               || operation.kind === "export" && response.kind === "exported"
               || operation.kind === "preview" && response.kind === "preview"
