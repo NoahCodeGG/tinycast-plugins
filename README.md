@@ -4,6 +4,20 @@
 
 ## 安装和使用
 
+### 从 GitHub 安装
+
+在 Tinycast 的 **Settings → Extensions → Install from GitHub** 中粘贴所需插件的目录链接。一次安装一个插件。Tinycast 需要能找到 Node.js 和一个包管理器。
+
+| 插件 | 安装目录 |
+| --- | --- |
+| 编码小助手 | [noah-codec](https://github.com/NoahCodeGG/tinycast-plugins/tree/tinycast-install/noah-codec) |
+| 计算稿纸 | [noah-calcpad](https://github.com/NoahCodeGG/tinycast-plugins/tree/tinycast-install/noah-calcpad) |
+| KDBX 密码库 | [noah-kdbx](https://github.com/NoahCodeGG/tinycast-plugins/tree/tinycast-install/noah-kdbx) |
+
+Tinycast 匿名读取 GitHub。使用私有仓库时，可通过下方的目录导入方式安装。GitHub 分发的 KDBX 插件包含 Apple Silicon 版读取程序。
+
+### 从本地目录安装
+
 1. 解压要安装的 ZIP。解压后的目录应包含 `package.json`、命令的 `.js` 文件和 `assets/`。
 2. 在 Tinycast 设置中启用扩展，从 **Extensions → Install New → Add from folder** 选择解压后的目录。从源码构建时，选择对应插件的 `dist/` 目录。
 
@@ -121,6 +135,8 @@ pnpm build
 ```
 
 运行 `pnpm package` 重新构建并在 `artifacts/` 生成带版本号的 ZIP。打包使用系统的 `zip` 命令。可直接发送 ZIP 或将其上传到 GitHub Release。接收者只需解压并从 Tinycast 导入，导入预构建包无需 Node.js 或 pnpm。
+
+运行 `pnpm package:github` 在 `artifacts/github-install/` 为每个插件生成独立安装目录。GitHub Actions 在 `main` 上的插件或构建文件更新后构建这些目录并发布到 `tinycast-install` 分支。安装时每个目录包含所需的命令和资源，KDBX 用户无需安装 Rust。
 
 从源码构建 `noah-kdbx` 需要 macOS、Xcode Command Line Tools 和 Rust 1.94+。`pnpm --filter noah-kdbx build` 会打包与当前 Node.js 架构一致的本地读取程序。预构建 ZIP 无需 Rust，可在对应架构的 Mac 导入。
 

@@ -11,6 +11,7 @@
     "build": "pnpm -r build",
     "typecheck": "tsc --noEmit",
     "package": "pnpm build && node scripts/package.mjs",
+    "package:github": "pnpm build && node scripts/package-github.mjs",
     "install:local": "node scripts/install-local.mjs"
   },
   "devDependencies": {

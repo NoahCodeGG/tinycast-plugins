@@ -1,0 +1,68 @@
+name: Publish Tinycast install branch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/tinycast-install.yml'
+      - 'packages/**'
+      - 'plugins/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tinycast-install
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-15
+    timeout-minutes: 20
+    env:
+      RUSTUP_TOOLCHAIN: '1.94.1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm package:github
+      - name: Publish folders
+        shell: bash
+        run: |
+          source_sha="$(git rev-parse HEAD)"
+          git fetch origin
+          publish="$RUNNER_TEMP/tinycast-install"
+          if git show-ref --verify --quiet refs/remotes/origin/tinycast-install; then
+            git worktree add --detach "$publish" origin/tinycast-install
+          else
+            git worktree add --detach "$publish" "$source_sha"
+            git -C "$publish" switch --orphan tinycast-install
+          fi
+
+          git -C "$publish" rm -qr --ignore-unmatch -- .
+          cp -R artifacts/github-install/. "$publish/"
+          git -C "$publish" add -A
+          if git -C "$publish" diff --cached --quiet; then
+            exit 0
+          fi
+
+          git -C "$publish" -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Build Tinycast extensions from ${source_sha:0:12}"
+          git -C "$publish" push origin HEAD:refs/heads/tinycast-install
